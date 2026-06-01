@@ -6,7 +6,11 @@ from app.schemas import CheckResult, PolicyDecision, SEVERITY_ORDER, Severity, V
 class PolicyEngine:
     version = "mvp-1"
 
-    def evaluate(self, checks: list[CheckResult]) -> PolicyDecision:
+    def evaluate(
+        self,
+        checks: list[CheckResult],
+        required_checks: set[str] | None = None,
+    ) -> PolicyDecision:
         if not checks:
             return PolicyDecision(
                 verdict=Verdict.BLOCK,
@@ -17,6 +21,14 @@ class PolicyEngine:
 
         categories = sorted({category for check in checks for category in check.categories})
         severity = max((check.severity for check in checks), key=SEVERITY_ORDER.get)
+        missing = sorted((required_checks or set()) - {check.check for check in checks})
+        if missing:
+            return PolicyDecision(
+                verdict=Verdict.BLOCK,
+                categories=sorted(set(categories) | {"internal_error"}),
+                severity=Severity.CRITICAL,
+                reason=f"Fail closed: mandatory security checks missing: {', '.join(missing)}",
+            )
 
         failed = [check for check in checks if check.error]
         if failed:
@@ -52,4 +64,3 @@ class PolicyEngine:
             severity=Severity.NONE,
             reason="All mandatory checks passed",
         )
-

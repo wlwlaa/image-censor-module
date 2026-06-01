@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hmac
 import io
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from PIL import Image
 
 from app.audit import AuditLogger
@@ -24,17 +25,34 @@ from app.storage import LocalArtifactStorage
 def create_app(
     settings: Settings | None = None,
     output_detector: OutputDetector | None = None,
+    audit_logger: AuditLogger | None = None,
 ) -> FastAPI:
     app = FastAPI(title="GenSecOps Psys Image Guardrail", version="0.1.0")
     config = settings or Settings.from_env()
     storage = LocalArtifactStorage(config.data_dir)
-    audit = AuditLogger(storage.audit_dir / "audit.jsonl")
+    audit = audit_logger or AuditLogger(storage.audit_dir / "audit.jsonl")
     passport_service = PassportService(config.hmac_secret)
     prompt_guard = PromptGuard()
     image_validator = ImageValidator(config.max_upload_bytes, config.max_pixels)
     ocr_pii_guard = OcrPiiGuard()
     detector = output_detector or MockOutputDetector()
     policy_engine = PolicyEngine()
+    detector_versions = {
+        "prompt_guard": prompt_guard.version,
+        "image_validator": image_validator.version,
+        "ocr_pii_guard": ocr_pii_guard.version,
+        "output_guard": detector.version,
+    }
+
+    @app.middleware("http")
+    async def enforce_content_length(request: Request, call_next):
+        if request.method == "POST" and request.url.path == "/v1/moderate":
+            content_length = request.headers.get("content-length")
+            if not content_length or not content_length.isdigit():
+                return JSONResponse(status_code=413, content={"detail": "Content-Length is required"})
+            if int(content_length) > config.max_request_bytes:
+                return JSONResponse(status_code=413, content={"detail": "Request body is too large"})
+        return await call_next(request)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -65,12 +83,17 @@ def create_app(
                 validator=image_validator,
                 checks=checks,
                 errors=errors,
+                hashes=hashes,
+                sha256=passport_service.sha256,
                 check_name="input_image_validation",
             )
             if source_image:
                 checks.append(ocr_pii_guard.check(source_image))
 
-        pre_generation_decision = policy_engine.evaluate(checks) if checks else None
+        required_input_checks = {"input_image_validation", "ocr_pii_guard"} if input_image else set()
+        pre_generation_decision = (
+            policy_engine.evaluate(checks, required_checks=required_input_checks) if checks else None
+        )
         if pre_generation_decision and pre_generation_decision.verdict != Verdict.ALLOW:
             return record_response(
                 audit=audit,
@@ -80,6 +103,8 @@ def create_app(
                 artifact_id=None,
                 hashes=hashes,
                 errors=errors,
+                policy_version=policy_engine.version,
+                detector_versions=detector_versions,
             )
 
         if generated_image:
@@ -112,15 +137,11 @@ def create_app(
                 errors.append(f"output_guard: {exc}")
                 checks.append(error_check("output_guard", exc))
 
-        decision = policy_engine.evaluate(checks)
+        required_output_checks = {"output_image_validation", "output_guard"} | required_input_checks
+        decision = policy_engine.evaluate(checks, required_checks=required_output_checks)
         passport = None
+        decision_audit_attempted = False
         if decision.verdict == Verdict.ALLOW and output_image:
-            detector_versions = {
-                "prompt_guard": prompt_guard.version,
-                "image_validator": image_validator.version,
-                "ocr_pii_guard": ocr_pii_guard.version,
-                "output_guard": detector.version,
-            }
             passport = passport_service.issue(
                 artifact_id=artifact_id,
                 content=output_image.normalized_png,
@@ -129,12 +150,48 @@ def create_app(
                 verdict=decision.verdict,
             )
             try:
+                decision_audit_attempted = True
+                append_decision_audit(
+                    audit=audit,
+                    request_id=request_id,
+                    checks=checks,
+                    decision=decision,
+                    artifact_id=artifact_id,
+                    hashes=hashes,
+                    errors=errors,
+                    policy_version=policy_engine.version,
+                    detector_versions=detector_versions,
+                    passport_digest=passport_service.digest(passport),
+                )
                 storage.promote(artifact_id, passport)
+                audit.append(
+                    {
+                        "event": "artifact_released",
+                        "request_id": request_id,
+                        "artifact_id": artifact_id,
+                        "timestamp": now_iso(),
+                        "hash": passport.sha256,
+                        "passport_digest": passport_service.digest(passport),
+                    }
+                )
             except Exception as exc:  # Never claim ALLOW if release promotion fails.
-                errors.append(f"release_promotion: {exc}")
-                checks.append(error_check("release_promotion", exc))
-                decision = policy_engine.evaluate(checks)
+                storage.revoke(artifact_id)
+                errors.append(f"release_pipeline: {exc}")
+                checks.append(error_check("release_pipeline", exc))
+                decision = policy_engine.evaluate(checks, required_checks=required_output_checks)
                 passport = None
+                try:
+                    audit.append(
+                        {
+                            "event": "artifact_release_failed",
+                            "request_id": request_id,
+                            "artifact_id": artifact_id,
+                            "timestamp": now_iso(),
+                            "reason": str(exc),
+                        }
+                    )
+                except Exception:
+                    pass
 
         return record_response(
             audit=audit,
@@ -145,19 +202,43 @@ def create_app(
             hashes=hashes,
             errors=errors,
             passport=passport,
+            policy_version=policy_engine.version,
+            detector_versions=detector_versions,
+            write_audit=passport is None and not decision_audit_attempted,
         )
 
     @app.get("/v1/download/{artifact_id}")
-    def download(artifact_id: str) -> Response:
+    def download(
+        artifact_id: str,
+        authorization: Annotated[str | None, Header()] = None,
+    ) -> Response:
+        request_id = uuid.uuid4().hex
+        expected_authorization = f"Bearer {config.download_token}"
+        if not authorization or not hmac.compare_digest(authorization, expected_authorization):
+            audit.append(
+                {
+                    "event": "download_denied",
+                    "request_id": request_id,
+                    "artifact_id": artifact_id,
+                    "timestamp": now_iso(),
+                    "reason": "Missing or invalid bearer token",
+                }
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Missing or invalid bearer token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         try:
             _, content, passport = storage.load_release(artifact_id)
         except (FileNotFoundError, ValueError):
             raise HTTPException(status_code=404, detail="Released artifact not found")
 
-        if not passport_service.verify(passport, content):
+        if not passport_service.verify(passport, content, expected_artifact_id=artifact_id):
             audit.append(
                 {
                     "event": "download_denied",
+                    "request_id": request_id,
                     "artifact_id": artifact_id,
                     "timestamp": now_iso(),
                     "reason": "Passport signature or artifact hash mismatch",
@@ -168,6 +249,7 @@ def create_app(
         audit.append(
             {
                 "event": "download_allowed",
+                "request_id": request_id,
                 "artifact_id": artifact_id,
                 "timestamp": now_iso(),
                 "hash": passport.sha256,
@@ -188,9 +270,12 @@ async def validate_upload(
     validator: ImageValidator,
     checks: list[CheckResult],
     errors: list[str],
+    hashes: dict[str, str],
+    sha256,
     check_name: str,
 ) -> ValidatedImage | None:
     content = await upload.read(validator.max_upload_bytes + 1)
+    hashes["input_file_hash"] = sha256(content)
     return validate_bytes(
         content,
         filename=upload.filename or "uploaded-image",
@@ -252,6 +337,9 @@ def record_response(
     hashes: dict[str, str],
     errors: list[str],
     passport=None,
+    policy_version: str,
+    detector_versions: dict[str, str],
+    write_audit: bool = True,
 ) -> ModerationResponse:
     response = ModerationResponse(
         request_id=request_id,
@@ -264,6 +352,35 @@ def record_response(
         checks=checks,
         errors=errors,
     )
+    if write_audit:
+        append_decision_audit(
+            audit=audit,
+            request_id=request_id,
+            checks=checks,
+            decision=decision,
+            artifact_id=artifact_id,
+            hashes=hashes,
+            errors=errors,
+            policy_version=policy_version,
+            detector_versions=detector_versions,
+            passport_digest=PassportService.digest(passport) if passport else None,
+        )
+    return response
+
+
+def append_decision_audit(
+    *,
+    audit: AuditLogger,
+    request_id: str,
+    checks: list[CheckResult],
+    decision,
+    artifact_id: str | None,
+    hashes: dict[str, str],
+    errors: list[str],
+    policy_version: str,
+    detector_versions: dict[str, str],
+    passport_digest: str | None,
+) -> None:
     audit.append(
         {
             "event": "moderation_decision",
@@ -277,13 +394,12 @@ def record_response(
             "artifact_id": artifact_id,
             "hashes": hashes,
             "errors": errors,
+            "policy_version": policy_version,
+            "detector_versions": detector_versions,
+            "passport_digest": passport_digest,
         }
     )
-    return response
 
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat()
-
-
-app = create_app()

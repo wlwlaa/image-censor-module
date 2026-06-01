@@ -22,8 +22,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-export GENSECOPS_HMAC_SECRET="replace-with-a-random-secret"
-uvicorn app.main:app --reload
+set -a
+source .env
+set +a
+uvicorn app.main:create_app --factory --reload
 ```
 
 Runtime storage is created automatically:
@@ -61,7 +63,8 @@ curl -sS -X POST http://127.0.0.1:8000/v1/moderate \
 Download an allowed artifact:
 
 ```bash
-curl -OJ http://127.0.0.1:8000/v1/download/<artifact_id>
+curl -OJ http://127.0.0.1:8000/v1/download/<artifact_id> \
+  -H "Authorization: Bearer ${GENSECOPS_DOWNLOAD_TOKEN}"
 ```
 
 Health check:
@@ -83,5 +86,43 @@ pytest
 - Local filesystem storage demonstrates enforcement but is not production
   object storage.
 - Audit is append-only JSONL, not WORM storage.
-- Authentication, tenant isolation, KMS/HSM signing, malware scanning, and
-  human review UI are production tasks.
+- Download authorization uses one environment-provided bearer token for the
+  demo. Per-user authorization and tenant isolation are roadmap tasks.
+- HMAC signing uses an environment-provided secret. KMS/HSM signing and key
+  rotation are roadmap tasks.
+- Request body size is bounded by `Content-Length`; a production reverse proxy
+  must also enforce its own body limit.
+- Malware scanning and human review UI are roadmap tasks.
+
+## Required environment variables
+
+| Variable | Purpose |
+|---|---|
+| `GENSECOPS_HMAC_SECRET` | HMAC signing secret, at least 32 characters |
+| `GENSECOPS_DOWNLOAD_TOKEN` | Demo download bearer token, at least 32 characters |
+| `GENSECOPS_DATA_DIR` | Runtime storage root, default `data` |
+| `GENSECOPS_MAX_UPLOAD_BYTES` | Per-file upload limit |
+| `GENSECOPS_MAX_REQUEST_BYTES` | Multipart request body limit |
+| `GENSECOPS_MAX_PIXELS` | Decoded image pixel limit |
+
+The application intentionally fails during factory creation if either required
+secret is missing or too short.
+
+## Implemented vs roadmap
+
+Implemented:
+
+- prompt rules and Unicode normalization;
+- input and output image validation with MIME consistency checks;
+- quarantine and release directories;
+- deterministic policy checks;
+- HMAC passport bound to artifact ID;
+- bearer-protected download with hash and signature verification;
+- audit-before-release flow.
+
+Roadmap:
+
+- validated ShieldGemma adapter;
+- production OCR, DLP, barcode and malware detectors;
+- private object storage with separate IAM roles;
+- tenant-aware authorization, KMS/HSM, WORM audit and SIEM forwarding.

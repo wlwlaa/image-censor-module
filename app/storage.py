@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
-import shutil
+import uuid
 from pathlib import Path
 
 from app.schemas import SafetyPassport
@@ -29,10 +30,24 @@ class LocalArtifactStorage:
         self._validate_artifact_id(artifact_id)
         source = self.quarantine_dir / f"{artifact_id}.png"
         destination = self.release_dir / f"{artifact_id}.png"
-        shutil.copyfile(source, destination)
         passport_path = self.release_dir / f"{artifact_id}.passport.json"
-        passport_path.write_text(passport.model_dump_json(indent=2), encoding="utf-8")
+        suffix = uuid.uuid4().hex
+        temp_destination = self.release_dir / f".{artifact_id}.{suffix}.png.tmp"
+        temp_passport = self.release_dir / f".{artifact_id}.{suffix}.passport.tmp"
+        try:
+            temp_destination.write_bytes(source.read_bytes())
+            temp_passport.write_text(passport.model_dump_json(indent=2), encoding="utf-8")
+            os.replace(temp_passport, passport_path)
+            os.replace(temp_destination, destination)
+        finally:
+            temp_destination.unlink(missing_ok=True)
+            temp_passport.unlink(missing_ok=True)
         return destination
+
+    def revoke(self, artifact_id: str) -> None:
+        self._validate_artifact_id(artifact_id)
+        (self.release_dir / f"{artifact_id}.png").unlink(missing_ok=True)
+        (self.release_dir / f"{artifact_id}.passport.json").unlink(missing_ok=True)
 
     def load_release(self, artifact_id: str) -> tuple[Path, bytes, SafetyPassport]:
         self._validate_artifact_id(artifact_id)
@@ -48,4 +63,3 @@ class LocalArtifactStorage:
     def _validate_artifact_id(artifact_id: str) -> None:
         if not ARTIFACT_ID_PATTERN.fullmatch(artifact_id):
             raise ValueError("Invalid artifact ID")
-
