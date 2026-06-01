@@ -31,6 +31,27 @@ uvicorn app.main:create_app --factory --reload
 The application fails during factory creation if either required secret is
 missing or shorter than 32 characters.
 
+Open the demo frontend:
+
+```text
+http://127.0.0.1:8000/
+```
+
+The `Demo token` field is required only for verified download. Enter the same
+value that was exported as `GENSECOPS_DOWNLOAD_TOKEN`; the browser keeps it only
+in the current page memory.
+
+### Manual UI check
+
+1. Open `http://127.0.0.1:8000/`.
+2. Enter `${GENSECOPS_DOWNLOAD_TOKEN}` into `Demo token`.
+3. Run `Safe image`: expect `ALLOW`, a Safety Passport, and a working Download.
+4. Run `Unsafe output`: expect `BLOCK`.
+5. Run `PII input`: expect a pre-generation `BLOCK` without an artifact ID.
+6. Run `Detector failure`: expect fail-closed `BLOCK`.
+7. Run `Tampered download`, modify the shown local release file, then press
+   Download: expect `HTTP 409`.
+
 ## Public demo
 
 ```bash

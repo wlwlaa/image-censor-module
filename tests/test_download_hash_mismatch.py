@@ -13,6 +13,14 @@ DOWNLOAD_TOKEN = "download-token-" + "x" * 32
 AUTH_HEADERS = {"Authorization": f"Bearer {DOWNLOAD_TOKEN}"}
 
 
+def test_root_serves_demo_frontend(tmp_path: Path) -> None:
+    client = TestClient(create_app(build_settings(tmp_path)))
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "GenSecOps" in response.text
+    assert "/static/app.js" in response.text
+
+
 def test_hash_mismatch_409(tmp_path: Path) -> None:
     client = TestClient(create_app(build_settings(tmp_path)))
     response = client.post("/v1/moderate", data={"prompt": "draw a safe corporate illustration"})

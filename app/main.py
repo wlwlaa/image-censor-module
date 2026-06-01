@@ -4,10 +4,12 @@ import hmac
 import io
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from app.audit import AuditLogger
@@ -43,6 +45,8 @@ def create_app(
         "ocr_pii_guard": ocr_pii_guard.version,
         "output_guard": detector.version,
     }
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     @app.middleware("http")
     async def enforce_content_length(request: Request, call_next):
@@ -57,6 +61,10 @@ def create_app(
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/", include_in_schema=False)
+    def demo_ui() -> FileResponse:
+        return FileResponse(static_dir / "index.html")
 
     @app.post("/v1/moderate", response_model=ModerationResponse)
     async def moderate(

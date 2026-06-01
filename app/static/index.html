@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenSecOps Image Guardrail</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Альфа-Банк</div>
+      <div class="status"><span></span> DEMO CONTOUR</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">GenSecOps Псы</p>
+        <h1>GenSecOps<br><strong>Image Guardrail</strong></h1>
+        <p class="lead">Независимый контур допуска изображений для банка</p>
+        <div class="flow">
+          <span>INPUT</span><b>→</b><span>QUARANTINE</span><b>→</b><span>POLICY</span><b>→</b><span>VERIFIED DOWNLOAD</span>
+        </div>
+      </section>
+
+      <section class="demo-grid">
+        <article class="panel form-panel">
+          <div class="panel-title">
+            <div>
+              <p class="eyebrow">01 / Проверка</p>
+              <h2>Новый запрос</h2>
+            </div>
+            <span class="badge">FAIL CLOSED</span>
+          </div>
+
+          <div class="presets" aria-label="Demo presets">
+            <button type="button" class="preset active" data-preset="safe">Safe image</button>
+            <button type="button" class="preset" data-preset="unsafe">Unsafe output</button>
+            <button type="button" class="preset" data-preset="pii">PII input</button>
+            <button type="button" class="preset" data-preset="failure">Detector failure</button>
+            <button type="button" class="preset" data-preset="tampered">Tampered download</button>
+          </div>
+
+          <form id="moderation-form">
+            <label>
+              <span>Prompt</span>
+              <textarea id="prompt" name="prompt" rows="4" placeholder="Опишите изображение"></textarea>
+            </label>
+            <div class="upload-grid">
+              <label class="upload">
+                <span>Input image</span>
+                <input id="input-image" name="input_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <small id="input-file-name">не выбран</small>
+              </label>
+              <label class="upload">
+                <span>Generated image</span>
+                <input id="generated-image" name="generated_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <small id="generated-file-name">не выбран</small>
+              </label>
+            </div>
+            <label>
+              <span>Demo token</span>
+              <input id="token" name="token" type="password" autocomplete="off" placeholder="GENSECOPS_DOWNLOAD_TOKEN">
+            </label>
+            <p class="hint" id="preset-hint"></p>
+            <button class="primary" id="submit-button" type="submit">Проверить изображение <b>→</b></button>
+          </form>
+        </article>
+
+        <article class="panel result-panel">
+          <div class="panel-title">
+            <div>
+              <p class="eyebrow">02 / Решение</p>
+              <h2>Safety decision</h2>
+            </div>
+          </div>
+          <div id="empty-state" class="empty-state">
+            <div class="empty-mark">?</div>
+            <p>Выберите сценарий и запустите проверку.</p>
+          </div>
+          <div id="result" class="result hidden" aria-live="polite"></div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <span>MOCK DETECTOR • DETERMINISTIC POLICY • SAFETY PASSPORT</span>
+      <span>MVP / PUBLIC DEMO</span>
+    </footer>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
