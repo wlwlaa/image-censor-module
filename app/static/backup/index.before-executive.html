@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenSecOps — AI Security Gateway</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand">Альфа-Банк</div>
+        <div class="divider"></div>
+        <div class="product">
+          <span class="product-name">GenSecOps</span>
+          <span class="product-tag">AI Security Gateway</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="status-pill"><span class="dot live"></span>SOC LIVE</div>
+        <div class="status-pill"><span class="dot ok"></span>ЦЕНЗОР АКТИВЕН</div>
+        <div class="status-pill subtle">v0.1 · DEMO</div>
+      </div>
+    </header>
+
+    <main>
+      <!-- HERO -->
+      <section class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">Independent GenAI Security Contour</p>
+          <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
+          <p class="lead">Независимый банковский контур контроля GenAI-контента: prompt-guard, изоляция, output-детектор, политика, подписанный паспорт.</p>
+        </div>
+        <div class="hero-stats">
+          <div><span class="stat-label">Режим</span><span class="stat-value">FAIL CLOSED</span></div>
+          <div><span class="stat-label">Политика</span><span class="stat-value">Детерминированная</span></div>
+          <div><span class="stat-label">Паспорт</span><span class="stat-value">HMAC SHA-256</span></div>
+          <div><span class="stat-label">Аудит</span><span class="stat-value">Append-only</span></div>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section class="panel pipeline-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Архитектура</p>
+            <h2>Контур безопасности</h2>
+          </div>
+          <span class="panel-meta" id="pipeline-status">ОЖИДАНИЕ</span>
+        </div>
+        <div class="pipeline" id="pipeline" role="list">
+          <div class="pipe-node" data-step="user"><span class="pipe-name">Пользователь</span><span class="pipe-sub">запрос</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="prompt"><span class="pipe-name">Prompt Guard</span><span class="pipe-sub">фильтр промпта</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="input"><span class="pipe-name">Input Guard</span><span class="pipe-sub">PII / документы</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="generator"><span class="pipe-name">Генератор</span><span class="pipe-sub">в карантине</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="quarantine"><span class="pipe-name">Карантин</span><span class="pipe-sub">изолированный store</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="output"><span class="pipe-name">Output Guard</span><span class="pipe-sub">детектор</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="policy"><span class="pipe-name">Политика</span><span class="pipe-sub">policy engine</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="passport"><span class="pipe-name">Паспорт</span><span class="pipe-sub">HMAC подпись</span></div>
+          <div class="pipe-arrow" aria-hidden="true"></div>
+          <div class="pipe-node" data-step="release"><span class="pipe-name">Релиз</span><span class="pipe-sub">проверенная выдача</span></div>
+        </div>
+      </section>
+
+      <!-- ROW 1: REQUEST | DECISION -->
+      <section class="grid-main">
+        <article class="panel request-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Запрос</p>
+              <h2>Новый запрос</h2>
+            </div>
+            <span class="badge red">FAIL CLOSED</span>
+          </div>
+
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="fraud" role="tab" aria-selected="true">Сценарии мошенничества</button>
+            <button class="tab" data-tab="ops" role="tab" aria-selected="false">Операционные сценарии</button>
+          </div>
+
+          <div class="case-grid" data-pane="fraud">
+            <button type="button" class="case" data-preset="passport">
+              <span class="case-name">Подделка паспорта</span>
+              <span class="case-meta">demo · через PII-эвристику</span>
+            </button>
+            <button type="button" class="case" data-preset="bankcard">
+              <span class="case-name">Редактирование карты</span>
+              <span class="case-meta">demo · через PII-эвристику</span>
+            </button>
+            <button type="button" class="case" data-preset="payment">
+              <span class="case-name">Платёжное поручение</span>
+              <span class="case-meta">demo · через PII-эвристику</span>
+            </button>
+            <button type="button" class="case" data-preset="deepfake">
+              <span class="case-name">Дипфейк руководителя</span>
+              <span class="case-meta">demo · roadmap-сигнал</span>
+            </button>
+            <button type="button" class="case" data-preset="phishing">
+              <span class="case-name">Фишинговый баннер</span>
+              <span class="case-meta">demo · roadmap-сигнал</span>
+            </button>
+          </div>
+
+          <div class="case-grid hidden" data-pane="ops">
+            <button type="button" class="case" data-preset="safe">
+              <span class="case-name">Безопасное изображение</span>
+              <span class="case-meta">ALLOW → подписанный паспорт</span>
+            </button>
+            <button type="button" class="case" data-preset="offline">
+              <span class="case-name">Цензор недоступен</span>
+              <span class="case-meta">отказ детектора → FAIL CLOSED</span>
+            </button>
+            <button type="button" class="case" data-preset="tampered">
+              <span class="case-name">Подмена файла</span>
+              <span class="case-meta">несовпадение HMAC → HTTP 409</span>
+            </button>
+          </div>
+
+          <form id="moderation-form">
+            <label class="field">
+              <span>Промпт</span>
+              <textarea id="prompt" name="prompt" rows="2" placeholder="Опишите изображение"></textarea>
+            </label>
+            <div class="upload-grid">
+              <label class="upload">
+                <span>Input image</span>
+                <input id="input-image" name="input_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <small id="input-file-name">не выбран</small>
+              </label>
+              <label class="upload">
+                <span>Generated image</span>
+                <input id="generated-image" name="generated_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <small id="generated-file-name">не выбран</small>
+              </label>
+            </div>
+            <label class="field">
+              <span>Токен загрузки</span>
+              <input id="token" name="token" type="password" autocomplete="off" placeholder="GENSECOPS_DOWNLOAD_TOKEN">
+            </label>
+            <p class="hint" id="preset-hint"></p>
+            <button class="primary" id="submit-button" type="submit">Запустить проверку <b>→</b></button>
+          </form>
+        </article>
+
+        <article class="panel decision-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Решение</p>
+              <h2>Решение безопасности</h2>
+            </div>
+            <span class="panel-meta" id="decision-meta">—</span>
+          </div>
+
+          <div class="decision-body">
+            <div id="empty-state" class="empty-state">
+              <div class="empty-mark">·</div>
+              <p>Выберите сценарий и запустите проверку.<br><span>Здесь появится итоговый вердикт.</span></p>
+            </div>
+
+            <div id="result" class="result hidden" aria-live="polite">
+              <div class="verdict-block">
+                <h3 class="verdict" id="verdict-text">—</h3>
+                <p class="reason" id="verdict-reason">—</p>
+                <div class="chips" id="verdict-chips"></div>
+              </div>
+
+              <aside class="risk-side">
+                <div class="risk-side-head">
+                  <span class="risk-side-label">Общий риск</span>
+                  <span class="risk-side-level" id="risk-level">—</span>
+                </div>
+                <div class="risk-bar"><div class="risk-bar-fill" id="risk-bar-fill" style="width:0%"></div></div>
+                <ul class="risk-mini" id="risk-list">
+                  <li data-risk="prompt"><span>Prompt</span><i><b style="width:0%"></b></i><em>—</em></li>
+                  <li data-risk="pii"><span>PII</span><i><b style="width:0%"></b></i><em>—</em></li>
+                  <li data-risk="fraud"><span>Fraud</span><i><b style="width:0%"></b></i><em>—</em></li>
+                  <li data-risk="output"><span>Output</span><i><b style="width:0%"></b></i><em>—</em></li>
+                </ul>
+              </aside>
+
+              <div class="decision-actions" id="decision-actions"></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- ROW 2: PASSPORT | SOC | TIMELINE -->
+      <section class="grid-3">
+        <article class="panel passport-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Верифицируемо</p>
+              <h2>Паспорт безопасности</h2>
+            </div>
+            <button class="ghost" id="export-passport" type="button" disabled>Экспорт JSON</button>
+          </div>
+          <div id="passport-empty" class="card-empty">Появится после первой проверки.</div>
+          <dl class="kv hidden" id="passport-kv">
+            <div><dt>Artifact ID</dt><dd id="pp-artifact" class="mono">—</dd></div>
+            <div><dt>Request ID</dt><dd id="pp-request" class="mono">—</dd></div>
+            <div><dt>Политика</dt><dd id="pp-policy">—</dd></div>
+            <div><dt>Детектор</dt><dd id="pp-detector">—</dd></div>
+            <div><dt>SHA-256</dt><dd id="pp-sha" class="mono">—</dd></div>
+            <div><dt>Решение</dt><dd id="pp-decision">—</dd></div>
+            <div class="signature-row"><dt>Подпись</dt><dd id="pp-signature" class="sig" data-state="PENDING">PENDING</dd></div>
+          </dl>
+        </article>
+
+        <article class="panel soc-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">SOC</p>
+              <h2>Событие SOC</h2>
+            </div>
+            <span class="panel-meta" id="soc-status">НЕТ СОБЫТИЙ</span>
+          </div>
+          <div id="soc-empty" class="card-empty">Появится при BLOCK / REVIEW / подмене файла.</div>
+          <div id="soc-card" class="soc-card hidden">
+            <div class="soc-headline">
+              <span class="severity-pill" id="soc-severity">—</span>
+              <span class="soc-title" id="soc-title">SOC ALERT</span>
+            </div>
+            <dl class="kv compact">
+              <div><dt>Event ID</dt><dd id="soc-event" class="mono">—</dd></div>
+              <div><dt>Категория</dt><dd id="soc-category">—</dd></div>
+              <div><dt>Статус</dt><dd id="soc-state">—</dd></div>
+              <div><dt>Время</dt><dd id="soc-time" class="mono">—</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="panel timeline-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Аудит</p>
+              <h2>Журнал проверки</h2>
+            </div>
+            <span class="panel-meta">Append-only</span>
+          </div>
+          <ol class="timeline" id="timeline">
+            <li data-step="prompt-received"><span class="t-dot"></span><div><b>Запрос принят</b><em>ожидание</em></div></li>
+            <li data-step="input-scan"><span class="t-dot"></span><div><b>Скан входа</b><em>ожидание</em></div></li>
+            <li data-step="generator"><span class="t-dot"></span><div><b>Генерация</b><em>ожидание</em></div></li>
+            <li data-step="output-scan"><span class="t-dot"></span><div><b>Скан выхода</b><em>ожидание</em></div></li>
+            <li data-step="policy"><span class="t-dot"></span><div><b>Политика</b><em>ожидание</em></div></li>
+            <li data-step="passport"><span class="t-dot"></span><div><b>Паспорт выпущен</b><em>ожидание</em></div></li>
+            <li data-step="download"><span class="t-dot"></span><div><b>Запрос загрузки</b><em>ожидание</em></div></li>
+          </ol>
+        </article>
+      </section>
+
+      <!-- ROW 3: METRICS | IMPACT -->
+      <section class="grid-2">
+        <article class="panel metrics-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Метрики · DEMO</p>
+              <h2>Метрики безопасности</h2>
+            </div>
+            <span class="panel-meta">Демо-данные</span>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="kpi-label">Recall</span><span class="kpi-value"><span class="kpi-num">—</span><small>DEMO</small></span><span class="kpi-foot">не измерено</span></div>
+            <div class="kpi"><span class="kpi-label">Precision</span><span class="kpi-value"><span class="kpi-num">—</span><small>DEMO</small></span><span class="kpi-foot">не измерено</span></div>
+            <div class="kpi"><span class="kpi-label">False Negatives</span><span class="kpi-value"><span class="kpi-num">—</span><small>DEMO</small></span><span class="kpi-foot">не измерено</span></div>
+            <div class="kpi"><span class="kpi-label">Заблокировано</span><span class="kpi-value"><span class="kpi-num" id="kpi-blocked">0</span><small>SESSION</small></span><span class="kpi-foot">в этой сессии UI</span></div>
+            <div class="kpi"><span class="kpi-label">На ревью</span><span class="kpi-value"><span class="kpi-num" id="kpi-review">0</span><small>SESSION</small></span><span class="kpi-foot">в этой сессии UI</span></div>
+            <div class="kpi"><span class="kpi-label">SOC-алерты</span><span class="kpi-value"><span class="kpi-num" id="kpi-soc">0</span><small>SESSION</small></span><span class="kpi-foot">в этой сессии UI</span></div>
+          </div>
+          <p class="disclaimer">Метрики качества (Recall / Precision / FN) показаны как «—». Реальные значения появятся после measured-валидации детекторов.</p>
+        </article>
+
+        <article class="panel impact-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Бизнес · DEMO</p>
+              <h2>Бизнес-эффект</h2>
+            </div>
+            <span class="panel-meta">Иллюстративно</span>
+          </div>
+          <ul class="impact-list">
+            <li><span class="impact-name">Предотвращённый фрод</span><span class="impact-desc">Сценарии подделки документов и платёжных поручений блокируются до релиза.</span></li>
+            <li><span class="impact-name">Защита PII</span><span class="impact-desc">Паспорта, карты, реквизиты — отсечка на input-стадии.</span></li>
+            <li><span class="impact-name">Стоп дипфейкам</span><span class="impact-desc">Маркер mock-детектора; продакшен — после интеграции модели.</span></li>
+            <li><span class="impact-name">Защита бренда</span><span class="impact-desc">Фишинг с логотипом не проходит policy engine.</span></li>
+            <li><span class="impact-name">Compliance</span><span class="impact-desc">Подписанный паспорт + append-only аудит на каждый артефакт.</span></li>
+          </ul>
+          <p class="disclaimer">Эффекты — иллюстративные. Используются для коммуникации архитектурной ценности контура, не для отчётности.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <span>GenSecOps · Independent GenAI Security Contour</span>
+      <span>MOCK DETECTOR · DETERMINISTIC POLICY · HMAC PASSPORT · APPEND-ONLY AUDIT</span>
+    </footer>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

@@ -3,89 +3,181 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GenSecOps Image Guardrail</title>
+    <title>GenSecOps — AI Security Gateway</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">Альфа-Банк</div>
-      <div class="status"><span></span> DEMO CONTOUR</div>
+      <div class="topbar-left">
+        <div class="brand">Альфа-Банк</div>
+        <div class="divider"></div>
+        <div class="product">
+          <span class="product-name">GenSecOps</span>
+          <span class="product-tag">AI Security Gateway</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="status-pill"><span class="dot live"></span>SOC LIVE</div>
+        <div class="status-pill"><span class="dot ok"></span>ЦЕНЗОР АКТИВЕН</div>
+        <div class="status-pill subtle">v0.1 · DEMO</div>
+      </div>
     </header>
 
     <main>
+      <!-- HEADER -->
       <section class="hero">
-        <p class="eyebrow">GenSecOps Псы</p>
-        <h1>GenSecOps<br><strong>Image Guardrail</strong></h1>
-        <p class="lead">Независимый контур допуска изображений для банка</p>
-        <div class="flow">
-          <span>INPUT</span><b>→</b><span>QUARANTINE</span><b>→</b><span>POLICY</span><b>→</b><span>VERIFIED DOWNLOAD</span>
+        <div class="hero-title">
+          <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
+          <p class="hero-sub">Независимый банковский контур контроля GenAI-контента.</p>
         </div>
+        <p class="killer">
+          Генератор считается <b>недоверенным</b> компонентом. Выдача результата возможна <b>только</b> после независимой проверки и подписанного паспорта безопасности.
+        </p>
       </section>
 
-      <section class="demo-grid">
-        <article class="panel form-panel">
-          <div class="panel-title">
-            <div>
-              <p class="eyebrow">01 / Проверка</p>
-              <h2>Новый запрос</h2>
-            </div>
-            <span class="badge">FAIL CLOSED</span>
-          </div>
+      <!-- ARCHITECTURE STRIP -->
+      <section class="pipeline" id="pipeline">
+        <div class="pipe-node" data-step="user"><span>Пользователь</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="prompt"><span>Проверка запроса</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="input"><span>Проверка изображения</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="generator"><span>Генератор</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="quarantine"><span>Карантин</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="output"><span>Проверка результата</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="policy"><span>Политика</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="passport"><span>Паспорт</span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="release"><span>Выдача</span></div>
+      </section>
 
-          <div class="presets" aria-label="Demo presets">
-            <button type="button" class="preset active" data-preset="safe">Safe image</button>
-            <button type="button" class="preset" data-preset="unsafe">Unsafe output</button>
-            <button type="button" class="preset" data-preset="pii">PII input</button>
-            <button type="button" class="preset" data-preset="failure">Detector failure</button>
-            <button type="button" class="preset" data-preset="tampered">Tampered download</button>
+      <!-- MAIN GRID -->
+      <section class="grid-main">
+        <!-- A. Сценарии + форма -->
+        <article class="panel scenarios-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Сценарии</p>
+            <span class="badge red">FAIL CLOSED</span>
           </div>
-
+          <div class="cases">
+            <button type="button" class="case active" data-preset="safe">Безопасное изображение</button>
+            <button type="button" class="case" data-preset="pii">PII / документ</button>
+            <button type="button" class="case" data-preset="unsafe">Опасный результат</button>
+            <button type="button" class="case" data-preset="offline">Цензор недоступен</button>
+            <button type="button" class="case" data-preset="tampered">Подмена файла</button>
+          </div>
           <form id="moderation-form">
-            <label>
-              <span>Prompt</span>
-              <textarea id="prompt" name="prompt" rows="4" placeholder="Опишите изображение"></textarea>
-            </label>
+            <textarea id="prompt" rows="2" placeholder="Промпт"></textarea>
             <div class="upload-grid">
               <label class="upload">
-                <span>Input image</span>
-                <input id="input-image" name="input_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <span>Входное изображение</span>
+                <input id="input-image" type="file" accept="image/png,image/jpeg,image/webp">
                 <small id="input-file-name">не выбран</small>
               </label>
               <label class="upload">
-                <span>Generated image</span>
-                <input id="generated-image" name="generated_image" type="file" accept="image/png,image/jpeg,image/webp">
+                <span>Сгенерированное</span>
+                <input id="generated-image" type="file" accept="image/png,image/jpeg,image/webp">
                 <small id="generated-file-name">не выбран</small>
               </label>
             </div>
-            <label>
-              <span>Demo token</span>
-              <input id="token" name="token" type="password" autocomplete="off" placeholder="GENSECOPS_DOWNLOAD_TOKEN">
-            </label>
-            <p class="hint" id="preset-hint"></p>
-            <button class="primary" id="submit-button" type="submit">Проверить изображение <b>→</b></button>
+            <input id="token" type="password" autocomplete="off" placeholder="Токен загрузки">
+            <button class="primary" id="submit-button" type="submit">Проверить <b>→</b></button>
           </form>
         </article>
 
-        <article class="panel result-panel">
-          <div class="panel-title">
-            <div>
-              <p class="eyebrow">02 / Решение</p>
-              <h2>Safety decision</h2>
+        <!-- B. Решение безопасности -->
+        <article class="panel decision-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Решение безопасности</p>
+            <span class="panel-meta" id="decision-meta">ОЖИДАНИЕ</span>
+          </div>
+          <div class="decision-body">
+            <h3 class="verdict" id="verdict-text" data-v="EMPTY">—</h3>
+            <p class="reason" id="verdict-reason">Выберите сценарий и нажмите «Проверить».</p>
+            <div class="chips" id="verdict-chips"></div>
+            <dl class="kv">
+              <div><dt>Severity</dt><dd id="d-severity">—</dd></div>
+              <div><dt>Request ID</dt><dd id="d-request" class="mono">—</dd></div>
+              <div><dt>Artifact ID</dt><dd id="d-artifact" class="mono">—</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <!-- C. Паспорт -->
+        <article class="panel passport-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Паспорт безопасности</p>
+            <span class="sig" id="pp-signature" data-state="PENDING">PENDING</span>
+          </div>
+          <dl class="kv">
+            <div><dt>SHA-256</dt><dd id="pp-sha" class="mono">—</dd></div>
+            <div><dt>Политика</dt><dd id="pp-policy">—</dd></div>
+            <div><dt>Детекторы</dt><dd id="pp-detector">—</dd></div>
+          </dl>
+          <div class="passport-actions">
+            <button class="primary-ghost" id="download-button" type="button" disabled>Скачать артефакт</button>
+            <button class="primary-ghost" id="export-passport" type="button" disabled>Экспорт JSON</button>
+          </div>
+        </article>
+      </section>
+
+      <!-- BOTTOM GRID -->
+      <section class="grid-bottom">
+        <!-- SOC -->
+        <article class="panel soc-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Событие SOC</p>
+            <span class="panel-meta" id="soc-status">НЕТ СОБЫТИЙ</span>
+          </div>
+          <div class="soc-body">
+            <div class="soc-headline">
+              <span class="severity-pill" id="soc-severity" data-sev="">—</span>
+              <span class="soc-title" id="soc-title">ожидание</span>
             </div>
+            <dl class="kv compact">
+              <div><dt>Event ID</dt><dd id="soc-event" class="mono">—</dd></div>
+              <div><dt>Категория</dt><dd id="soc-category">—</dd></div>
+              <div><dt>Статус</dt><dd id="soc-state">—</dd></div>
+            </dl>
           </div>
-          <div id="empty-state" class="empty-state">
-            <div class="empty-mark">?</div>
-            <p>Выберите сценарий и запустите проверку.</p>
+        </article>
+
+        <!-- Журнал -->
+        <article class="panel timeline-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Журнал проверки</p>
+            <span class="panel-meta">Append-only</span>
           </div>
-          <div id="result" class="result hidden" aria-live="polite"></div>
+          <ol class="timeline" id="timeline">
+            <li data-step="request"><span class="t-dot"></span><div><b>Запрос</b><em>ожидание</em></div></li>
+            <li data-step="input"><span class="t-dot"></span><div><b>Скан входа</b><em>ожидание</em></div></li>
+            <li data-step="generator"><span class="t-dot"></span><div><b>Генерация</b><em>ожидание</em></div></li>
+            <li data-step="output"><span class="t-dot"></span><div><b>Скан выхода</b><em>ожидание</em></div></li>
+            <li data-step="decision"><span class="t-dot"></span><div><b>Решение</b><em>ожидание</em></div></li>
+          </ol>
+        </article>
+
+        <!-- Что защищаем -->
+        <article class="panel protect-panel">
+          <div class="panel-head">
+            <p class="eyebrow">Что защищаем</p>
+            <span class="panel-meta">demo</span>
+          </div>
+          <ul class="protect-list">
+            <li><span class="dot-red"></span>Поддельные паспорта</li>
+            <li><span class="dot-red"></span>Банковские карты</li>
+            <li><span class="dot-red"></span>Платёжные документы</li>
+            <li><span class="dot-red"></span>Дипфейки сотрудников</li>
+            <li><span class="dot-red"></span>Фишинговые материалы</li>
+          </ul>
         </article>
       </section>
     </main>
-
-    <footer>
-      <span>MOCK DETECTOR • DETERMINISTIC POLICY • SAFETY PASSPORT</span>
-      <span>MVP / PUBLIC DEMO</span>
-    </footer>
     <script src="/static/app.js" defer></script>
   </body>
 </html>
