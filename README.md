@@ -15,7 +15,7 @@ metadata contains markers such as `unsafe`, `violence`, `gore`, or `pii`.
 The MVP PII adapter scans filenames and metadata. It is not a production OCR
 engine. See [architecture](docs/architecture.md) for the replacement points.
 
-## Run
+## Quick start
 
 ```bash
 python3 -m venv .venv
@@ -27,6 +27,28 @@ source .env
 set +a
 uvicorn app.main:create_app --factory --reload
 ```
+
+The application fails during factory creation if either required secret is
+missing or shorter than 32 characters.
+
+## Public demo
+
+```bash
+./scripts/demo.sh
+```
+
+The script starts a local server when needed and demonstrates:
+
+1. safe image `ALLOW` and verified download;
+2. unsafe mock output `BLOCK`;
+3. PII input `BLOCK` before release;
+4. detector failure with fail-closed `BLOCK`;
+5. tampered release rejected with HTTP `409`.
+
+Run the demo against the local service: the final scenario intentionally
+modifies a file in local release storage.
+
+Presenter notes: [docs/demo_script.md](docs/demo_script.md).
 
 Runtime storage is created automatically:
 
@@ -105,9 +127,6 @@ pytest
 | `GENSECOPS_MAX_REQUEST_BYTES` | Multipart request body limit |
 | `GENSECOPS_MAX_PIXELS` | Decoded image pixel limit |
 
-The application intentionally fails during factory creation if either required
-secret is missing or too short.
-
 ## Implemented vs roadmap
 
 Implemented:
@@ -126,3 +145,6 @@ Roadmap:
 - production OCR, DLP, barcode and malware detectors;
 - private object storage with separate IAM roles;
 - tenant-aware authorization, KMS/HSM, WORM audit and SIEM forwarding.
+
+Detailed scope: [docs/implemented_vs_roadmap.md](docs/implemented_vs_roadmap.md).
+Security review summary: [docs/security_review_summary.md](docs/security_review_summary.md).
