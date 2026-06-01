@@ -11,13 +11,6 @@ const hint = null;
 const exportButton = document.querySelector("#export-passport");
 const downloadButton = document.querySelector("#download-button");
 const decisionMeta = document.querySelector("#decision-meta");
-const decisionPanel = document.querySelector(".decision-panel");
-const passportEmpty = document.querySelector("#pp-empty");
-const passportContent = document.querySelector("#pp-content");
-const downloadMessage = document.querySelector("#download-message");
-const socPanel = document.querySelector(".soc-panel");
-const socEmpty = document.querySelector("#soc-empty");
-const socBody = document.querySelector("#soc-body");
 
 // ===== State =====
 let activePreset = "safe";
@@ -28,68 +21,17 @@ let lastPayload = null;
 // ===== Preset → backend mapping (existing heuristics, unchanged) =====
 const transparentPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const presetConfig = {
-  safe:     { prompt: "Создать безопасную корпоративную иллюстрацию" },
+  safe:     { prompt: "draw a safe corporate illustration" },
   pii:      { input: "passport-card.png" },
   unsafe:   { generated: "unsafe-content.png" },
   offline:  { generated: "detector_error.png" },
-  tampered: { prompt: "Создать безопасную корпоративную иллюстрацию" },
+  tampered: { prompt: "draw a safe corporate illustration" },
 };
 
 const RISK_CATS = {
   prompt: ["prompt_injection", "jailbreak", "policy_violation"],
   pii:    ["pii", "pii_passport", "payment_details", "qr_or_barcode"],
   output: ["graphic_violence", "unsafe_content", "detector_error", "nsfw"],
-};
-const CATEGORY_LABELS = {
-  no_categories: "Нарушений не выявлено",
-  prompt_injection: "Инъекция в запросе",
-  jailbreak: "Обход ограничений",
-  policy_violation: "Нарушение политики",
-  pii: "Персональные данные",
-  pii_passport: "Персональные данные / документ",
-  payment_details: "Платёжные данные",
-  qr_or_barcode: "QR-код или штрихкод",
-  graphic_violence: "Опасный контент",
-  unsafe_content: "Опасный контент",
-  detector_error: "Сбой цензора",
-  internal_error: "Сбой цензора",
-  nsfw: "Недопустимый контент",
-  guardrail_offline: "Сбой цензора",
-  integrity_violation: "Нарушение целостности",
-};
-const REASON_LABELS = {
-  "All mandatory checks passed": "Все обязательные проверки пройдены.",
-  "Potential PII, payment details, or barcode marker detected before provider call": "Обнаружены признаки персональных или платёжных данных до обращения к генератору.",
-  "Mock output detector found an unsafe filename or metadata marker": "При проверке результата обнаружен опасный контент.",
-  "Prompt contains a forbidden content marker": "В запросе обнаружен запрещённый маркер.",
-  "Prompt contains a suspicious bypass marker": "В запросе обнаружена попытка обхода ограничений.",
-  "No security checks were executed": "Проверки безопасности не были выполнены.",
-};
-const SEVERITY_LABELS = {
-  NONE: "НЕТ",
-  LOW: "НИЗКИЙ",
-  MEDIUM: "СРЕДНИЙ",
-  HIGH: "ВЫСОКИЙ",
-  CRITICAL: "КРИТИЧЕСКИЙ",
-};
-const VERDICT_LABELS = {
-  ALLOW: "РАЗРЕШЕНО",
-  BLOCK: "ЗАБЛОКИРОВАНО",
-  REVIEW: "НА ПРОВЕРКЕ",
-  OFFLINE: "ЗАПРЕТ ВЫДАЧИ",
-  ERROR: "ОШИБКА",
-};
-const SIGNATURE_LABELS = {
-  VALID: "ДЕЙСТВИТЕЛЕН",
-  INVALID: "НЕДЕЙСТВИТЕЛЕН",
-  PENDING: "ОЖИДАЕТ",
-  "N/A": "НЕТ",
-};
-const DETECTOR_LABELS = {
-  prompt_guard: "проверка запроса",
-  image_validator: "проверка изображения",
-  ocr_pii_guard: "PII-анализ",
-  output_guard: "проверка результата",
 };
 
 // ===== Helpers =====
@@ -100,39 +42,6 @@ function pngFile(name) {
 function esc(v) {
   return String(v ?? "—").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c]);
-}
-function categoryLabel(value) {
-  return CATEGORY_LABELS[value] || "Категория риска";
-}
-function categoriesText(items) {
-  return (items || []).map(categoryLabel).join(", ");
-}
-function reasonLabel(value) {
-  if (!value) return "Решение сформировано политикой безопасности.";
-  if (REASON_LABELS[value]) return REASON_LABELS[value];
-  if (value.startsWith("Fail closed:")) return "Выдача запрещена: обязательная проверка недоступна.";
-  return "Решение сформировано политикой безопасности.";
-}
-function severityLabel(value) {
-  return SEVERITY_LABELS[value] || value || "—";
-}
-function compactValue(value, head = 12, tail = 8) {
-  if (!value) return "—";
-  const text = String(value);
-  return text.length > head + tail + 1 ? `${text.slice(0, head)}…${text.slice(-tail)}` : text;
-}
-function setCompactText(selector, value, head, tail) {
-  const el = document.querySelector(selector);
-  el.textContent = compactValue(value, head, tail);
-  el.title = value || "";
-}
-function setDownloadMessage(text = "", state = "") {
-  downloadMessage.textContent = text;
-  downloadMessage.className = `download-message${state ? ` ${state}` : ""}`;
-}
-function setDecisionState(state = "") {
-  decisionPanel.classList.toggle("state-allow", state === "allow");
-  decisionPanel.classList.toggle("state-block", state === "block");
 }
 function updateFileLabels() {
   document.querySelector("#input-file-name").textContent = inputImage.files[0]?.name || presetInputFile?.name || "не выбран";
@@ -201,28 +110,34 @@ function finalizePipeline(payload) {
 // ===== Decision render =====
 function chipsHtml(items) {
   const values = items?.length ? items : ["no_categories"];
-  return values.map(item => `<span class="chip${item === "no_categories" ? " neutral" : ""}" title="${esc(item)}">${esc(categoryLabel(item))}</span>`).join("");
+  return values.map(item => `<span class="chip">${esc(item)}</span>`).join("");
 }
 function showPayload(payload) {
   lastPayload = payload;
   const offline = activePreset === "offline" || (payload.categories || []).includes("detector_error");
-  const verdictDisplay = VERDICT_LABELS[offline ? "OFFLINE" : payload.verdict] || payload.verdict;
+  const verdictDisplay = offline ? "FAIL CLOSED" : payload.verdict;
   const verdictKey = offline ? "OFFLINE" : payload.verdict;
 
   const vEl = document.querySelector("#verdict-text");
   vEl.textContent = verdictDisplay;
   vEl.dataset.v = verdictKey;
-  document.querySelector("#verdict-reason").textContent = reasonLabel(payload.reason);
-  document.querySelector("#verdict-reason").title = payload.reason || "";
+  document.querySelector("#verdict-reason").textContent = payload.reason || "—";
   document.querySelector("#verdict-chips").innerHTML = chipsHtml(payload.categories);
-  document.querySelector("#d-severity").textContent = severityLabel(payload.severity);
-  document.querySelector("#d-severity").title = payload.severity || "";
-  setCompactText("#d-request", payload.request_id, 12, 6);
-  setCompactText("#d-artifact", payload.artifact_id, 12, 6);
-  decisionMeta.textContent = verdictDisplay;
-  setDecisionState(payload.verdict === "ALLOW" ? "allow" : "block");
-  renderPassport(payload);
-  setDownloadMessage();
+  document.querySelector("#d-severity").textContent = payload.severity || "—";
+  document.querySelector("#d-request").textContent = payload.request_id || "—";
+  document.querySelector("#d-artifact").textContent = payload.artifact_id || "—";
+  decisionMeta.textContent = offline ? "FAIL CLOSED" : verdictDisplay;
+
+  // Passport
+  const p = payload.passport || {};
+  document.querySelector("#pp-sha").textContent = p.sha256 || "—";
+  document.querySelector("#pp-policy").textContent = p.policy_version || "—";
+  const dv = p.detector_versions ? Object.entries(p.detector_versions).map(([k,v]) => `${k}=${v}`).join(", ") : "—";
+  document.querySelector("#pp-detector").textContent = dv;
+  const sig = document.querySelector("#pp-signature");
+  const sigState = payload.verdict === "ALLOW" ? "VALID" : payload.verdict === "REVIEW" ? "PENDING" : "N/A";
+  sig.textContent = sigState;
+  sig.dataset.state = sigState;
 
   const canDownload = payload.verdict === "ALLOW" && payload.artifact_id;
   downloadButton.disabled = !canDownload;
@@ -235,11 +150,10 @@ function showPayload(payload) {
 }
 function showError(message) {
   const vEl = document.querySelector("#verdict-text");
-  vEl.textContent = VERDICT_LABELS.ERROR; vEl.dataset.v = "ERROR";
+  vEl.textContent = "ERROR"; vEl.dataset.v = "ERROR";
   document.querySelector("#verdict-reason").textContent = message;
   document.querySelector("#verdict-chips").innerHTML = "";
   decisionMeta.textContent = "ОШИБКА";
-  setDecisionState("block");
 }
 function resetDecision() {
   const vEl = document.querySelector("#verdict-text");
@@ -247,92 +161,32 @@ function resetDecision() {
   document.querySelector("#verdict-reason").textContent = "";
   document.querySelector("#verdict-chips").innerHTML = "";
   document.querySelector("#d-severity").textContent = "—";
-  setCompactText("#d-request", "");
-  setCompactText("#d-artifact", "");
+  document.querySelector("#d-request").textContent = "—";
+  document.querySelector("#d-artifact").textContent = "—";
   decisionMeta.textContent = "ВЫПОЛНЕНИЕ";
-  setDecisionState();
-  resetPassport();
-  resetSoc();
-}
-
-// ===== Passport =====
-function renderPassport(payload) {
-  const p = payload.passport;
-  const sig = document.querySelector("#pp-signature");
-  const sigState = p ? "VALID" : payload.verdict === "REVIEW" ? "PENDING" : "N/A";
-  sig.textContent = SIGNATURE_LABELS[sigState];
-  sig.dataset.state = sigState;
-  if (!p) {
-    passportContent.classList.add("hidden");
-    passportEmpty.classList.remove("hidden");
-    passportEmpty.textContent = payload.verdict === "BLOCK"
-      ? "Паспорт не выпущен: выдача артефакта заблокирована."
-      : "Паспорт появится после разрешённой проверки.";
-    return;
-  }
-  passportEmpty.classList.add("hidden");
-  passportContent.classList.remove("hidden");
-  setCompactText("#pp-sha", p.sha256, 13, 9);
-  document.querySelector("#pp-policy").textContent = p.policy_version || "—";
-  document.querySelector("#pp-policy").title = p.policy_version || "";
-  const detectors = p.detector_versions || {};
-  const detectorNames = Object.keys(detectors).map(name => DETECTOR_LABELS[name] || name).join(" · ") || "—";
-  document.querySelector("#pp-detector").textContent = detectorNames;
-  document.querySelector("#pp-detector").title = JSON.stringify(detectors);
-}
-function resetPassport() {
-  passportEmpty.classList.remove("hidden");
-  passportContent.classList.add("hidden");
-  passportEmpty.textContent = "Паспорт появится после разрешённой проверки.";
-  const sig = document.querySelector("#pp-signature");
-  sig.textContent = SIGNATURE_LABELS.PENDING;
-  sig.dataset.state = "PENDING";
-  downloadButton.disabled = true;
-  exportButton.disabled = true;
-  setDownloadMessage();
 }
 
 // ===== SOC =====
-function resetSoc() {
-  socPanel.classList.remove("alert");
-  socEmpty.classList.remove("hidden");
-  socBody.classList.add("hidden");
-  document.querySelector("#soc-status").textContent = "НЕТ СОБЫТИЙ";
-}
 function renderSoc(payload) {
   const status = document.querySelector("#soc-status");
   const sev = document.querySelector("#soc-severity");
   const title = document.querySelector("#soc-title");
   if (payload.verdict === "ALLOW") {
-    resetSoc();
+    status.textContent = "НЕТ СОБЫТИЙ";
+    sev.textContent = "—"; sev.dataset.sev = "";
+    title.textContent = "событий нет";
+    document.querySelector("#soc-event").textContent = "—";
+    document.querySelector("#soc-category").textContent = "—";
+    document.querySelector("#soc-state").textContent = "—";
     return;
   }
-  socPanel.classList.add("alert");
-  socEmpty.classList.add("hidden");
-  socBody.classList.remove("hidden");
-  status.textContent = "ИНЦИДЕНТ SOC";
+  status.textContent = "АЛЕРТ";
   const severity = payload.severity || (payload.verdict === "BLOCK" ? "HIGH" : "MEDIUM");
-  sev.textContent = severityLabel(severity); sev.dataset.sev = severity;
-  sev.title = severity;
-  title.textContent = activePreset === "offline" ? "ЗАПРЕТ ВЫДАЧИ · цензор недоступен" : "ИНЦИДЕНТ SOC";
+  sev.textContent = severity; sev.dataset.sev = severity;
+  title.textContent = activePreset === "offline" ? "FAIL CLOSED · цензор недоступен" : "SOC ALERT";
   document.querySelector("#soc-event").textContent = `EVT-${(payload.request_id || "demo0001").slice(0, 8)}`;
-  document.querySelector("#soc-category").textContent = categoriesText(payload.categories) || (activePreset === "offline" ? "Сбой цензора" : "Нарушение политики");
-  document.querySelector("#soc-category").title = (payload.categories || []).join(", ");
-  document.querySelector("#soc-state").textContent = "ОТКРЫТ";
-}
-function renderTamperSoc(artifactId) {
-  socPanel.classList.add("alert");
-  socEmpty.classList.add("hidden");
-  socBody.classList.remove("hidden");
-  document.querySelector("#soc-status").textContent = "ИНЦИДЕНТ SOC";
-  document.querySelector("#soc-severity").textContent = severityLabel("CRITICAL");
-  document.querySelector("#soc-severity").dataset.sev = "CRITICAL";
-  document.querySelector("#soc-severity").title = "CRITICAL";
-  document.querySelector("#soc-title").textContent = "ИНЦИДЕНТ SOC · подмена файла";
-  document.querySelector("#soc-event").textContent = `EVT-${String(artifactId || "demo0001").slice(0, 8)}`;
-  document.querySelector("#soc-category").textContent = "Нарушение целостности";
-  document.querySelector("#soc-category").title = "integrity_violation";
-  document.querySelector("#soc-state").textContent = "ОТКРЫТ";
+  document.querySelector("#soc-category").textContent = (payload.categories || []).join(", ") || (activePreset === "offline" ? "guardrail_offline" : "policy_violation");
+  document.querySelector("#soc-state").textContent = "OPEN";
 }
 
 // ===== Timeline =====
@@ -353,7 +207,7 @@ function renderTimeline(payload) {
       input:     { state: "done", note: "чисто" },
       generator: { state: "done", note: "в карантине" },
       output:    { state: "blocked", note: "детектор недоступен" },
-      decision:  { state: "blocked", note: "ЗАПРЕТ ВЫДАЧИ" },
+      decision:  { state: "blocked", note: "FAIL CLOSED" },
     });
     return;
   }
@@ -363,7 +217,7 @@ function renderTimeline(payload) {
       input:     { state: "done", note: "чисто" },
       generator: { state: "done", note: "выполнено" },
       output:    { state: "done", note: "чисто" },
-      decision:  { state: "done", note: "РАЗРЕШЕНО · паспорт" },
+      decision:  { state: "done", note: "ALLOW · паспорт" },
     });
     return;
   }
@@ -375,10 +229,10 @@ function renderTimeline(payload) {
     input:     { state: "done", note: "проверено" },
     generator: { state: "done", note: "в карантине" },
     output:    { state: "done", note: "проверено" },
-    decision:  { state: "blocked", note: VERDICT_LABELS[payload.verdict] || "ЗАБЛОКИРОВАНО" },
+    decision:  { state: "blocked", note: payload.verdict || "BLOCK" },
   };
   if (blockedStep !== "decision") {
-    states[blockedStep] = { state: "blocked", note: "ЗАБЛОКИРОВАНО" };
+    states[blockedStep] = { state: "blocked", note: "BLOCK" };
     const order = ["request","input","generator","output","decision"];
     const idx = order.indexOf(blockedStep);
     order.slice(idx + 1, order.length - 1).forEach(s => { delete states[s]; });
@@ -397,12 +251,9 @@ async function downloadArtifact(artifactId) {
       const payload = await response.json().catch(() => ({}));
       if (response.status === 409) {
         const sig = document.querySelector("#pp-signature");
-        sig.textContent = SIGNATURE_LABELS.INVALID; sig.dataset.state = "INVALID";
-        setDownloadMessage("Выдача запрещена: подпись или SHA-256 не прошли проверку.", "error");
-        renderTamperSoc(artifactId);
-        return;
+        sig.textContent = "INVALID"; sig.dataset.state = "INVALID";
       }
-      setDownloadMessage(`Загрузка отклонена: HTTP ${response.status}. ${payload.detail || ""}`, "error");
+      showError(`Загрузка отклонена: HTTP ${response.status}. ${payload.detail || ""}`);
       return;
     }
     const blob = await response.blob();
@@ -411,9 +262,8 @@ async function downloadArtifact(artifactId) {
     link.download = `${artifactId}.png`;
     link.click();
     URL.revokeObjectURL(link.href);
-    setDownloadMessage("Артефакт выдан после проверки подписи.", "success");
   } catch (e) {
-    setDownloadMessage(`Сбой загрузки: ${e.message}`, "error");
+    showError(`Сбой загрузки: ${e.message}`);
   }
 }
 
@@ -467,5 +317,3 @@ inputImage.addEventListener("change", () => { presetInputFile = null; updateFile
 generatedImage.addEventListener("change", () => { presetGeneratedFile = null; updateFileLabels(); });
 choosePreset("safe");
 setPipelineState({ user: "done" });
-resetPassport();
-resetSoc();

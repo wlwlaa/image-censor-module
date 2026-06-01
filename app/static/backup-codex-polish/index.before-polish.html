@@ -17,9 +17,9 @@
         </div>
       </div>
       <div class="topbar-right">
-        <div class="status-pill"><span class="dot live"></span>SOC ПОДКЛЮЧЕН</div>
+        <div class="status-pill"><span class="dot live"></span>SOC LIVE</div>
         <div class="status-pill"><span class="dot ok"></span>ЦЕНЗОР АКТИВЕН</div>
-        <div class="status-pill subtle">v0.1 · ДЕМО</div>
+        <div class="status-pill subtle">v0.1 · DEMO</div>
       </div>
     </header>
 
@@ -28,33 +28,32 @@
       <section class="hero">
         <div class="hero-title">
           <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
-          <p class="hero-sub">Независимый банковский контур допуска и контроля GenAI-артефактов.</p>
+          <p class="hero-sub">Независимый банковский контур контроля GenAI-контента.</p>
         </div>
         <p class="killer">
-          Генератор считается <b>недоверенным компонентом</b>.<br>
-          Ни одно изображение не может попасть клиенту банка без независимой проверки и подписанного паспорта безопасности.
+          Генератор считается <b>недоверенным</b> компонентом. Выдача результата возможна <b>только</b> после независимой проверки и подписанного паспорта безопасности.
         </p>
       </section>
 
       <!-- ARCHITECTURE STRIP -->
       <section class="pipeline" id="pipeline">
-        <div class="pipe-node" data-step="user"><span class="pipe-index">01</span><span class="pipe-copy"><strong>Запрос</strong><small>клиент банка</small></span></div>
+        <div class="pipe-node" data-step="user"><span>Пользователь</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="prompt"><span class="pipe-index">02</span><span class="pipe-copy"><strong>Проверка запроса</strong><small>анализ запроса</small></span></div>
+        <div class="pipe-node" data-step="prompt"><span>Проверка запроса</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="input"><span class="pipe-index">03</span><span class="pipe-copy"><strong>Проверка изображения</strong><small>PII / документ</small></span></div>
+        <div class="pipe-node" data-step="input"><span>Проверка изображения</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="generator"><span class="pipe-index">04</span><span class="pipe-copy"><strong>Генератор</strong><small>недоверенный</small></span></div>
+        <div class="pipe-node" data-step="generator"><span>Генератор</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="quarantine"><span class="pipe-index">05</span><span class="pipe-copy"><strong>Карантин</strong><small>изоляция</small></span></div>
+        <div class="pipe-node" data-step="quarantine"><span>Карантин</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="output"><span class="pipe-index">06</span><span class="pipe-copy"><strong>Проверка результата</strong><small>анализ результата</small></span></div>
+        <div class="pipe-node" data-step="output"><span>Проверка результата</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="policy"><span class="pipe-index">07</span><span class="pipe-copy"><strong>Политика</strong><small>запрет по умолчанию</small></span></div>
+        <div class="pipe-node" data-step="policy"><span>Политика</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="passport"><span class="pipe-index">08</span><span class="pipe-copy"><strong>Паспорт</strong><small>HMAC подпись</small></span></div>
+        <div class="pipe-node" data-step="passport"><span>Паспорт</span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="release"><span class="pipe-index">09</span><span class="pipe-copy"><strong>Выдача</strong><small>клиенту</small></span></div>
+        <div class="pipe-node" data-step="release"><span>Выдача</span></div>
       </section>
 
       <!-- MAIN GRID -->
@@ -63,7 +62,7 @@
         <article class="panel scenarios-panel">
           <div class="panel-head">
             <p class="eyebrow">Сценарии</p>
-            <span class="badge red">ЗАПРЕТ ПО УМОЛЧАНИЮ</span>
+            <span class="badge red">FAIL CLOSED</span>
           </div>
           <div class="cases">
             <button type="button" class="case active" data-preset="safe">Безопасное изображение</button>
@@ -73,7 +72,7 @@
             <button type="button" class="case" data-preset="tampered">Подмена файла</button>
           </div>
           <form id="moderation-form">
-            <textarea id="prompt" rows="2" placeholder="Описание запроса"></textarea>
+            <textarea id="prompt" rows="2" placeholder="Промпт"></textarea>
             <div class="upload-grid">
               <label class="upload">
                 <span>Входное изображение</span>
@@ -86,7 +85,7 @@
                 <small id="generated-file-name">не выбран</small>
               </label>
             </div>
-            <input id="token" type="password" autocomplete="off" placeholder="Токен проверенной выдачи">
+            <input id="token" type="password" autocomplete="off" placeholder="Токен загрузки">
             <button class="primary" id="submit-button" type="submit">Проверить <b>→</b></button>
           </form>
         </article>
@@ -102,9 +101,9 @@
             <p class="reason" id="verdict-reason">Выберите сценарий и нажмите «Проверить».</p>
             <div class="chips" id="verdict-chips"></div>
             <dl class="kv">
-              <div><dt>Уровень</dt><dd id="d-severity">—</dd></div>
-              <div><dt>ID запроса</dt><dd id="d-request" class="mono">—</dd></div>
-              <div><dt>ID артефакта</dt><dd id="d-artifact" class="mono">—</dd></div>
+              <div><dt>Severity</dt><dd id="d-severity">—</dd></div>
+              <div><dt>Request ID</dt><dd id="d-request" class="mono">—</dd></div>
+              <div><dt>Artifact ID</dt><dd id="d-artifact" class="mono">—</dd></div>
             </dl>
           </div>
         </article>
@@ -113,10 +112,9 @@
         <article class="panel passport-panel">
           <div class="panel-head">
             <p class="eyebrow">Паспорт безопасности</p>
-            <span class="sig" id="pp-signature" data-state="PENDING">ОЖИДАЕТ</span>
+            <span class="sig" id="pp-signature" data-state="PENDING">PENDING</span>
           </div>
-          <div class="empty-state" id="pp-empty">Паспорт появится после разрешённой проверки.</div>
-          <dl class="kv hidden" id="pp-content">
+          <dl class="kv">
             <div><dt>SHA-256</dt><dd id="pp-sha" class="mono">—</dd></div>
             <div><dt>Политика</dt><dd id="pp-policy">—</dd></div>
             <div><dt>Детекторы</dt><dd id="pp-detector">—</dd></div>
@@ -125,7 +123,6 @@
             <button class="primary-ghost" id="download-button" type="button" disabled>Скачать артефакт</button>
             <button class="primary-ghost" id="export-passport" type="button" disabled>Экспорт JSON</button>
           </div>
-          <p class="download-message" id="download-message"></p>
         </article>
       </section>
 
@@ -137,14 +134,13 @@
             <p class="eyebrow">Событие SOC</p>
             <span class="panel-meta" id="soc-status">НЕТ СОБЫТИЙ</span>
           </div>
-          <div class="empty-state" id="soc-empty">Инцидентов нет. Событие появится при блокировке или нарушении целостности.</div>
-          <div class="soc-body hidden" id="soc-body">
+          <div class="soc-body">
             <div class="soc-headline">
               <span class="severity-pill" id="soc-severity" data-sev="">—</span>
               <span class="soc-title" id="soc-title">ожидание</span>
             </div>
             <dl class="kv compact">
-              <div><dt>ID события</dt><dd id="soc-event" class="mono">—</dd></div>
+              <div><dt>Event ID</dt><dd id="soc-event" class="mono">—</dd></div>
               <div><dt>Категория</dt><dd id="soc-category">—</dd></div>
               <div><dt>Статус</dt><dd id="soc-state">—</dd></div>
             </dl>
@@ -155,7 +151,7 @@
         <article class="panel timeline-panel">
           <div class="panel-head">
             <p class="eyebrow">Журнал проверки</p>
-            <span class="panel-meta">НЕИЗМЕНЯЕМЫЙ</span>
+            <span class="panel-meta">Append-only</span>
           </div>
           <ol class="timeline" id="timeline">
             <li data-step="request"><span class="t-dot"></span><div><b>Запрос</b><em>ожидание</em></div></li>
@@ -170,7 +166,7 @@
         <article class="panel protect-panel">
           <div class="panel-head">
             <p class="eyebrow">Что защищаем</p>
-            <span class="panel-meta">ДЕМО-КОНТУР</span>
+            <span class="panel-meta">demo</span>
           </div>
           <ul class="protect-list">
             <li><span class="dot-red"></span>Поддельные паспорта</li>
