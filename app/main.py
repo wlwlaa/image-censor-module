@@ -235,6 +235,18 @@ def create_app(
             "cases": [public_demo_case(case, dataset_dir) for case in cases],
         }
 
+    @app.post("/demo-dataset/upload")
+    async def upload_demo_dataset(files: Annotated[list[UploadFile], File()]) -> dict[str, Any]:
+        dataset_dir = demo_dataset_dir()
+        await save_demo_dataset_uploads(files, dataset_dir, max_file_bytes=config.max_upload_bytes)
+        cases = load_demo_manifest(dataset_dir)
+        validate_demo_manifest_files(cases, dataset_dir)
+        return {
+            "status": "success",
+            "count": len(cases),
+            "cases": [public_demo_case(case, dataset_dir) for case in cases],
+        }
+
     @app.post("/demo-dataset/run")
     async def run_demo_dataset() -> dict[str, Any]:
         dataset_dir = demo_dataset_dir()
@@ -354,6 +366,73 @@ def demo_dataset_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "demo_dataset"
 
 
+async def save_demo_dataset_uploads(
+    files: list[UploadFile],
+    dataset_dir: Path,
+    *,
+    max_file_bytes: int,
+) -> None:
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload manifest.json and dataset images")
+
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    upload_names = [upload.filename or "" for upload in files]
+    common_root = demo_upload_common_root(upload_names)
+    saved_manifest = False
+
+    for upload in files:
+        relative = resolve_demo_upload_path(upload.filename or "", dataset_dir, common_root)
+        if relative.suffix.lower() not in {".json", ".png", ".jpg", ".jpeg"}:
+            raise HTTPException(status_code=400, detail=f"Unsupported dataset file type: {relative.name}")
+        if relative.suffix.lower() == ".json" and relative.name != "manifest.json":
+            raise HTTPException(status_code=400, detail="Only manifest.json is allowed as a JSON dataset file")
+
+        content = await upload.read(max_file_bytes + 1)
+        if len(content) > max_file_bytes:
+            raise HTTPException(status_code=413, detail=f"Dataset file is too large: {relative.name}")
+
+        target = dataset_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        saved_manifest = saved_manifest or relative.name == "manifest.json"
+
+    if not saved_manifest:
+        raise HTTPException(status_code=400, detail="Uploaded dataset must include manifest.json")
+
+
+def demo_upload_common_root(names: list[str]) -> Optional[str]:
+    parts = [Path(name).parts for name in names if name]
+    if not parts or any(len(item) < 2 for item in parts):
+        return None
+    first = parts[0][0]
+    if first == "demo_dataset":
+        return None
+    if all(item[0] == first for item in parts):
+        return first
+    return None
+
+
+def resolve_demo_upload_path(raw_path: str, dataset_dir: Path, common_root: Optional[str]) -> Path:
+    if not raw_path.strip():
+        raise HTTPException(status_code=400, detail="Dataset upload filename is empty")
+
+    relative = Path(raw_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise HTTPException(status_code=400, detail="Dataset upload path must stay inside demo_dataset/")
+    if relative.parts and relative.parts[0] == "demo_dataset":
+        relative = Path(*relative.parts[1:])
+    elif common_root and relative.parts and relative.parts[0] == common_root:
+        relative = Path(*relative.parts[1:])
+    if not relative.parts:
+        raise HTTPException(status_code=400, detail="Dataset upload path is invalid")
+
+    target = (dataset_dir / relative).resolve()
+    resolved_dataset_dir = dataset_dir.resolve()
+    if target != resolved_dataset_dir and resolved_dataset_dir not in target.parents:
+        raise HTTPException(status_code=400, detail="Dataset upload path escapes demo_dataset/")
+    return relative
+
+
 def load_demo_manifest(dataset_dir: Path) -> list[dict[str, Any]]:
     manifest_path = dataset_dir / "manifest.json"
     if not manifest_path.exists():
@@ -377,6 +456,17 @@ def load_demo_manifest(dataset_dir: Path) -> list[dict[str, Any]]:
             raise HTTPException(status_code=400, detail=f"Dataset case {item['id']} has no input, generated, or prompt")
         cases.append(item)
     return cases
+
+
+def validate_demo_manifest_files(cases: list[dict[str, Any]], dataset_dir: Path) -> None:
+    for case in cases:
+        for field in ("input", "generated"):
+            raw_path = case.get(field)
+            if not raw_path:
+                continue
+            path = resolve_demo_file(raw_path, dataset_dir)
+            if not path.exists() or not path.is_file():
+                raise HTTPException(status_code=400, detail=f"Dataset file not found: {raw_path}")
 
 
 def public_demo_case(case: dict[str, Any], dataset_dir: Path) -> dict[str, Any]:

@@ -21,6 +21,7 @@ const socBody = document.querySelector("#soc-body");
 const apiDemoImage = document.querySelector("#api-demo-image");
 const apiDemoButton = document.querySelector("#api-demo-button");
 const apiDemoResult = document.querySelector("#api-demo-result");
+const datasetUploadInput = document.querySelector("#dataset-upload-input");
 const datasetDemoButton = document.querySelector("#dataset-demo-button");
 const datasetProgress = document.querySelector("#dataset-progress");
 const datasetResults = document.querySelector("#dataset-results");
@@ -134,6 +135,18 @@ async function apiGetDataset() {
 async function apiRunDataset() {
   try {
     return parseJson(await fetch("/demo-dataset/run", { method: "POST" }));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
+
+async function apiUploadDataset(files) {
+  const body = new FormData();
+  for (const file of files) {
+    body.append("files", file, file.webkitRelativePath || file.name);
+  }
+  try {
+    return parseJson(await fetch("/demo-dataset/upload", { method: "POST", body }));
   } catch (error) {
     throw new Error(userMessage(error.message));
   }
@@ -540,14 +553,26 @@ form.addEventListener("submit", async event => {
 function renderDatasetRows(rows) {
   datasetResults.innerHTML = rows.map((item, index) => `
     <tr class="${item.passed ? "pass" : "fail"}">
-      <td>${index + 1}</td>
       <td>${esc(item.title)}</td>
       <td>${esc(item.expected_decision)}</td>
       <td>${esc(item.actual_decision)}</td>
       <td>${item.passed ? "PASS" : "FAIL"}</td>
-      <td title="${esc(item.reason)}">${esc(reasonLabel(item.reason))}</td>
     </tr>
   `).join("");
+}
+
+function dashboardPayloadFromDatasetResult(item) {
+  return {
+    request_id: item.id || "dataset-demo",
+    verdict: item.actual_decision || "ERROR",
+    categories: [],
+    severity: item.actual_decision === "ALLOW" ? "NONE" : "HIGH",
+    reason: item.reason,
+    artifact_id: item.artifact_id,
+    passport: item.passport,
+    checks: [],
+    errors: [],
+  };
 }
 
 function sleep(ms) {
@@ -560,31 +585,65 @@ async function loadDatasetManifest() {
     const payload = await apiGetDataset();
     datasetResults.innerHTML = (payload.cases || []).map((item, index) => `
       <tr>
-        <td>${index + 1}</td>
         <td>${esc(item.title)}</td>
         <td>${esc(item.expected_decision)}</td>
         <td>—</td>
         <td>—</td>
-        <td title="${esc(item.description)}">${esc(item.description || "ожидает запуска")}</td>
       </tr>
-    `).join("") || `<tr><td colspan="6">manifest пуст</td></tr>`;
-    datasetProgress.textContent = `Готово: ${payload.count || 0} кейсов`;
-    datasetSummary.textContent = "Ожидает запуска";
+    `).join("") || `<tr><td colspan="4">manifest пуст</td></tr>`;
+    datasetProgress.textContent = `0/${payload.count || 0}`;
+    datasetCurrentCase.textContent = payload.count ? "готово к запуску" : "—";
+    datasetCurrentExpected.textContent = "—";
+    datasetCurrentActual.textContent = "—";
+    datasetSummary.textContent = `0/${payload.count || 0} PASS`;
     datasetSummary.dataset.state = "";
     return payload;
   } catch (e) {
     datasetProgress.textContent = `Ошибка: ${e.message}`;
-    datasetSummary.textContent = "Автодемо завершено: FAIL";
+    datasetSummary.textContent = "FAIL";
     datasetSummary.dataset.state = "fail";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
     throw e;
   }
 }
 
+datasetUploadInput.addEventListener("change", async () => {
+  const files = Array.from(datasetUploadInput.files || []);
+  if (!files.length) return;
+  datasetDemoButton.disabled = true;
+  datasetProgress.textContent = "Загрузка датасета";
+  try {
+    const payload = await apiUploadDataset(files);
+    datasetResults.innerHTML = (payload.cases || []).map(item => `
+      <tr>
+        <td>${esc(item.title)}</td>
+        <td>${esc(item.expected_decision)}</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+    `).join("") || `<tr><td colspan="4">manifest пуст</td></tr>`;
+    datasetProgress.textContent = `0/${payload.count || 0}`;
+    datasetCurrentCase.textContent = "датасет загружен";
+    datasetCurrentExpected.textContent = "—";
+    datasetCurrentActual.textContent = "—";
+    datasetSummary.textContent = `0/${payload.count || 0} PASS`;
+    datasetSummary.dataset.state = "";
+  } catch (e) {
+    datasetProgress.textContent = `Ошибка: ${e.message}`;
+    datasetCurrentCase.textContent = "ошибка загрузки";
+    datasetSummary.textContent = "FAIL";
+    datasetSummary.dataset.state = "fail";
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
+  } finally {
+    datasetUploadInput.value = "";
+    datasetDemoButton.disabled = false;
+  }
+});
+
 datasetDemoButton.addEventListener("click", async () => {
   datasetDemoButton.disabled = true;
   datasetDemoButton.textContent = "Автодемо выполняется…";
-  datasetSummary.textContent = "Автодемо выполняется";
+  datasetSummary.textContent = "0/0 PASS";
   datasetSummary.dataset.state = "";
   datasetCurrentCase.textContent = "—";
   datasetCurrentExpected.textContent = "—";
@@ -601,25 +660,29 @@ datasetDemoButton.addEventListener("click", async () => {
     for (const item of payload.results || []) {
       rows.push(item);
       renderDatasetRows(rows);
-      datasetProgress.textContent = `Шаг ${rows.length}/${payload.count}`;
+      datasetProgress.textContent = `${rows.length}/${payload.count}`;
       datasetCurrentCase.textContent = item.title || "—";
       datasetCurrentExpected.textContent = item.expected_decision || "—";
       datasetCurrentActual.textContent = item.actual_decision || "—";
       datasetCurrentResult.textContent = item.passed ? "PASS" : "FAIL";
       datasetCurrentResult.dataset.state = item.passed ? "pass" : "fail";
+      datasetSummary.textContent = `${rows.filter(row => row.passed).length}/${payload.count} PASS`;
+      datasetSummary.dataset.state = item.passed ? "pass" : "fail";
+      showPayload(dashboardPayloadFromDatasetResult(item));
       await sleep(1200);
     }
-    datasetProgress.textContent = `Готово: ${payload.count}/${payload.count}`;
-    datasetSummary.textContent = `Автодемо завершено: ${payload.passed}/${payload.count} PASS`;
+    datasetProgress.textContent = `${payload.count}/${payload.count}`;
+    datasetSummary.textContent = `${payload.passed}/${payload.count} PASS`;
     datasetSummary.dataset.state = payload.passed === payload.count ? "pass" : "fail";
   } catch (e) {
     datasetProgress.textContent = `Ошибка: ${e.message}`;
-    datasetSummary.textContent = "Автодемо завершено: FAIL";
+    datasetSummary.textContent = "FAIL";
     datasetSummary.dataset.state = "fail";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
+    showError(e.message);
   } finally {
     datasetDemoButton.disabled = false;
-    datasetDemoButton.textContent = "▶ Запустить автодемо по датасету";
+    datasetDemoButton.textContent = "▶ Запустить автодемо";
   }
 });
 
@@ -653,3 +716,4 @@ choosePreset("safe");
 setPipelineState({ user: "done" });
 resetPassport();
 resetSoc();
+loadDatasetManifest().catch(() => {});

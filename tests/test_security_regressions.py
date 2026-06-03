@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.config import Settings
+import app.main as main_module
 from app.main import create_app
 
 
@@ -67,6 +68,50 @@ def test_pre_generation_block_audit_contains_input_hash_and_versions(tmp_path: P
     assert event["hashes"]["input_file_hash"]
     assert event["policy_version"] == "mvp-1"
     assert event["detector_versions"]["output_guard"] == "mock-1"
+
+
+def test_demo_dataset_upload_rejects_path_traversal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(main_module, "demo_dataset_dir", lambda: tmp_path / "demo_dataset")
+    settings = Settings(data_dir=tmp_path / "data", hmac_secret=HMAC_SECRET, download_token=DOWNLOAD_TOKEN)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/demo-dataset/upload",
+        files=[("files", ("../manifest.json", b"[]", "application/json"))],
+    )
+
+    assert response.status_code == 400
+    assert "inside demo_dataset" in response.json()["detail"]
+
+
+def test_demo_dataset_upload_saves_manifest_and_images(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dataset_dir = tmp_path / "demo_dataset"
+    monkeypatch.setattr(main_module, "demo_dataset_dir", lambda: dataset_dir)
+    settings = Settings(data_dir=tmp_path / "data", hmac_secret=HMAC_SECRET, download_token=DOWNLOAD_TOKEN)
+    client = TestClient(create_app(settings))
+    manifest = json.dumps(
+        [
+            {
+                "id": "case-001",
+                "title": "Custom safe",
+                "input": "demo_dataset/input.png",
+                "expected_decision": "ALLOW",
+            }
+        ]
+    ).encode("utf-8")
+
+    response = client.post(
+        "/demo-dataset/upload",
+        files=[
+            ("files", ("custom/manifest.json", manifest, "application/json")),
+            ("files", ("custom/input.png", png_bytes(), "image/png")),
+        ],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert (dataset_dir / "manifest.json").exists()
+    assert (dataset_dir / "input.png").exists()
 
 
 def png_bytes() -> bytes:

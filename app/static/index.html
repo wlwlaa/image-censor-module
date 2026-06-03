@@ -24,88 +24,71 @@
     </header>
 
     <main>
-      <section class="presentation-demo">
-        <div class="presentation-head">
-          <p class="eyebrow">Presentation Mode</p>
-          <h1>Демо защиты GenAI-изображений</h1>
-          <p>Проверяем локальный датасет через AI Security Gateway: ALLOW / BLOCK / fail-closed / Safety Passport</p>
+      <!-- HEADER -->
+      <section class="hero">
+        <div class="hero-title">
+          <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
+          <p class="hero-sub">Независимый банковский контур допуска и контроля GenAI-артефактов.</p>
         </div>
-        <ul class="presentation-protect">
-          <li>Поддельные документы</li>
-          <li>Платёжные данные</li>
-          <li>Опасный output</li>
-          <li>Сбой цензора</li>
-          <li>Паспорт безопасности</li>
-        </ul>
-        <button class="presentation-run" id="dataset-demo-button" type="button">▶ Запустить автодемо по датасету</button>
-        <section class="presentation-status">
-          <div>
-            <span>Прогресс</span>
-            <strong id="dataset-progress">Готово к запуску</strong>
-          </div>
-          <div>
-            <span>Текущий кейс</span>
-            <strong id="dataset-current-case">—</strong>
-          </div>
-          <div>
-            <span>Expected</span>
-            <strong id="dataset-current-expected">—</strong>
-          </div>
-          <div>
-            <span>Actual</span>
-            <strong id="dataset-current-actual">—</strong>
-          </div>
-          <div>
-            <span>Result</span>
-            <strong id="dataset-current-result">—</strong>
-          </div>
-        </section>
-        <table class="dataset-table presentation-table">
-          <thead>
-            <tr><th>#</th><th>Сценарий</th><th>Expected</th><th>Actual</th><th>PASS/FAIL</th><th>Причина</th></tr>
-          </thead>
-          <tbody id="dataset-results">
-            <tr><td colspan="6">Результаты появятся после запуска</td></tr>
-          </tbody>
-        </table>
-        <div class="presentation-summary" id="dataset-summary">—</div>
+        <p class="killer">
+          Генератор считается <b>недоверенным компонентом</b>.<br>
+          Ни одно изображение не может попасть клиенту банка без независимой проверки и подписанного паспорта безопасности.
+        </p>
       </section>
 
-      <details class="advanced-demo">
-        <summary>Расширенный ручной режим</summary>
-        <div class="advanced-content">
-          <!-- HEADER -->
-          <section class="hero">
-            <div class="hero-title">
-              <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
-              <p class="hero-sub">Независимый банковский контур допуска и контроля GenAI-артефактов.</p>
-            </div>
-            <p class="killer">
-              Генератор считается <b>недоверенным компонентом</b>.<br>
-              Ни одно изображение не может попасть клиенту банка без независимой проверки и подписанного паспорта безопасности.
-            </p>
-          </section>
+      <section class="dataset-demo-panel">
+        <div class="dataset-demo-title">
+          <p class="eyebrow">Автодемо по датасету</p>
+          <span>Локальные изображения проходят через backend AI Security Gateway.</span>
+        </div>
+        <label class="dataset-upload-button">
+          Загрузить свой датасет
+          <input id="dataset-upload-input" type="file" accept=".json,image/png,image/jpeg" webkitdirectory directory multiple>
+        </label>
+        <button class="dataset-demo-button" id="dataset-demo-button" type="button">▶ Запустить автодемо</button>
+        <div class="dataset-demo-stat">
+          <span>Прогресс</span>
+          <strong id="dataset-progress">0/0</strong>
+        </div>
+        <div class="dataset-demo-stat wide">
+          <span>Текущий кейс</span>
+          <strong id="dataset-current-case">—</strong>
+        </div>
+        <div class="dataset-demo-stat">
+          <span>Expected</span>
+          <strong id="dataset-current-expected">—</strong>
+        </div>
+        <div class="dataset-demo-stat">
+          <span>Actual</span>
+          <strong id="dataset-current-actual">—</strong>
+        </div>
+        <div class="dataset-demo-stat result">
+          <span>Итог</span>
+          <strong id="dataset-summary">—</strong>
+          <strong class="hidden" id="dataset-current-result">—</strong>
+        </div>
+      </section>
 
-          <!-- ARCHITECTURE STRIP -->
-          <section class="pipeline" id="pipeline">
-            <div class="pipe-node" data-step="user"><span class="pipe-index">01</span><span class="pipe-copy"><strong>Запрос</strong><small>клиент банка</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="prompt"><span class="pipe-index">02</span><span class="pipe-copy"><strong>Проверка запроса</strong><small>анализ запроса</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="input"><span class="pipe-index">03</span><span class="pipe-copy"><strong>Проверка изображения</strong><small>PII / документ</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="generator"><span class="pipe-index">04</span><span class="pipe-copy"><strong>Генератор</strong><small>недоверенный</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="quarantine"><span class="pipe-index">05</span><span class="pipe-copy"><strong>Карантин</strong><small>изоляция</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="output"><span class="pipe-index">06</span><span class="pipe-copy"><strong>Проверка результата</strong><small>анализ результата</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="policy"><span class="pipe-index">07</span><span class="pipe-copy"><strong>Политика</strong><small>запрет по умолчанию</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="passport"><span class="pipe-index">08</span><span class="pipe-copy"><strong>Паспорт</strong><small>HMAC подпись</small></span></div>
-            <div class="pipe-arrow"></div>
-            <div class="pipe-node" data-step="release"><span class="pipe-index">09</span><span class="pipe-copy"><strong>Выдача</strong><small>клиенту</small></span></div>
-          </section>
+      <!-- ARCHITECTURE STRIP -->
+      <section class="pipeline" id="pipeline">
+        <div class="pipe-node" data-step="user"><span class="pipe-index">01</span><span class="pipe-copy"><strong>Запрос</strong><small>клиент банка</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="prompt"><span class="pipe-index">02</span><span class="pipe-copy"><strong>Проверка запроса</strong><small>анализ запроса</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="input"><span class="pipe-index">03</span><span class="pipe-copy"><strong>Проверка изображения</strong><small>PII / документ</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="generator"><span class="pipe-index">04</span><span class="pipe-copy"><strong>Генератор</strong><small>недоверенный</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="quarantine"><span class="pipe-index">05</span><span class="pipe-copy"><strong>Карантин</strong><small>изоляция</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="output"><span class="pipe-index">06</span><span class="pipe-copy"><strong>Проверка результата</strong><small>анализ результата</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="policy"><span class="pipe-index">07</span><span class="pipe-copy"><strong>Политика</strong><small>запрет по умолчанию</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="passport"><span class="pipe-index">08</span><span class="pipe-copy"><strong>Паспорт</strong><small>HMAC подпись</small></span></div>
+        <div class="pipe-arrow"></div>
+        <div class="pipe-node" data-step="release"><span class="pipe-index">09</span><span class="pipe-copy"><strong>Выдача</strong><small>клиенту</small></span></div>
+      </section>
 
       <!-- MAIN GRID -->
       <section class="grid-main">
@@ -214,6 +197,17 @@
             <li data-step="output"><span class="t-dot"></span><div><b>Скан выхода</b><em>ожидание</em></div></li>
             <li data-step="decision"><span class="t-dot"></span><div><b>Решение</b><em>ожидание</em></div></li>
           </ol>
+          <div class="dataset-results-box">
+            <div class="dataset-results-title">Результаты автодемо</div>
+            <table class="dataset-table">
+              <thead>
+                <tr><th>Сценарий</th><th>Expected</th><th>Actual</th><th>PASS/FAIL</th></tr>
+              </thead>
+              <tbody id="dataset-results">
+                <tr><td colspan="4">Результаты появятся после запуска</td></tr>
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <!-- Что защищаем -->
@@ -230,7 +224,7 @@
             <li><span class="dot-red"></span>Фишинговые материалы</li>
           </ul>
           <details class="manual-api-box">
-            <summary>Ручная API-проверка</summary>
+            <summary>API demo / Llama Guard</summary>
             <label class="upload api-upload">
               <span>API demo / Llama Guard</span>
               <input id="api-demo-image" type="file" accept="image/png,image/jpeg,image/webp">
@@ -240,8 +234,6 @@
           </details>
         </article>
       </section>
-        </div>
-      </details>
     </main>
     <script src="/static/app.js" defer></script>
   </body>

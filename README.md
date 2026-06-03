@@ -96,7 +96,9 @@ data/audit/audit.jsonl
 ## Local dataset auto demo
 
 For defense, put your own `.png`, `.jpg`, or `.jpeg` files into
-`demo_dataset/` and edit `demo_dataset/manifest.json`.
+`demo_dataset/` and edit `demo_dataset/manifest.json`. You can also open `/`
+and use `Загрузить свой датасет` to upload a folder containing `manifest.json`
+and images into the local `demo_dataset/` directory.
 
 Each manifest item declares the files and expected decision:
 
@@ -183,6 +185,14 @@ Run local dataset auto demo:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/demo-dataset/run
+```
+
+Upload a local dataset folder through the backend:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/demo-dataset/upload \
+  -F 'files=@demo_dataset/manifest.json' \
+  -F 'files=@demo_dataset/case001_input.png'
 ```
 
 ## Full API demo mode
