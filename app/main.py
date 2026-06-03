@@ -3,9 +3,9 @@ from __future__ import annotations
 import hmac
 import io
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -20,14 +20,15 @@ from app.guards.output_guard import MockOutputDetector, OutputDetector
 from app.guards.prompt_guard import PromptGuard
 from app.passport import PassportService
 from app.policy_engine import PolicyEngine
+from app.routers.api_demo import router as api_demo_router
 from app.schemas import CheckResult, ModerationResponse, Severity, Verdict
 from app.storage import LocalArtifactStorage
 
 
 def create_app(
-    settings: Settings | None = None,
-    output_detector: OutputDetector | None = None,
-    audit_logger: AuditLogger | None = None,
+    settings: Optional[Settings] = None,
+    output_detector: Optional[OutputDetector] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> FastAPI:
     app = FastAPI(title="GenSecOps Psys Image Guardrail", version="0.1.0")
     config = settings or Settings.from_env()
@@ -47,6 +48,7 @@ def create_app(
     }
     static_dir = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.include_router(api_demo_router)
 
     @app.middleware("http")
     async def enforce_content_length(request: Request, call_next):
@@ -68,12 +70,12 @@ def create_app(
 
     @app.post("/v1/moderate", response_model=ModerationResponse)
     async def moderate(
-        prompt: Annotated[str | None, Form()] = None,
-        input_image: Annotated[UploadFile | None, File()] = None,
-        generated_image: Annotated[UploadFile | None, File()] = None,
+        prompt: Annotated[Optional[str], Form()] = None,
+        input_image: Annotated[Optional[UploadFile], File()] = None,
+        generated_image: Annotated[Optional[UploadFile], File()] = None,
     ) -> ModerationResponse:
         request_id = uuid.uuid4().hex
-        artifact_id: str | None = None
+        artifact_id: Optional[str] = None
         hashes: dict[str, str] = {}
         checks: list[CheckResult] = []
         errors: list[str] = []
@@ -84,7 +86,7 @@ def create_app(
         if prompt:
             checks.append(prompt_guard.check(prompt))
 
-        source_image: ValidatedImage | None = None
+        source_image: Optional[ValidatedImage] = None
         if input_image:
             source_image = await validate_upload(
                 input_image,
@@ -218,7 +220,7 @@ def create_app(
     @app.get("/v1/download/{artifact_id}")
     def download(
         artifact_id: str,
-        authorization: Annotated[str | None, Header()] = None,
+        authorization: Annotated[Optional[str], Header()] = None,
     ) -> Response:
         request_id = uuid.uuid4().hex
         expected_authorization = f"Bearer {config.download_token}"
@@ -281,7 +283,7 @@ async def validate_upload(
     hashes: dict[str, str],
     sha256,
     check_name: str,
-) -> ValidatedImage | None:
+) -> Optional[ValidatedImage]:
     content = await upload.read(validator.max_upload_bytes + 1)
     hashes["input_file_hash"] = sha256(content)
     return validate_bytes(
@@ -299,12 +301,12 @@ def validate_bytes(
     content: bytes,
     *,
     filename: str,
-    content_type: str | None,
+    content_type: Optional[str],
     validator: ImageValidator,
     checks: list[CheckResult],
     errors: list[str],
     check_name: str,
-) -> ValidatedImage | None:
+) -> Optional[ValidatedImage]:
     try:
         image, result = validator.validate(content, filename, content_type)
         checks.append(result.model_copy(update={"check": check_name}))
@@ -326,7 +328,7 @@ def error_check(check_name: str, exc: Exception) -> CheckResult:
     )
 
 
-def mock_generate(prompt: str | None, source_image: ValidatedImage | None) -> bytes:
+def mock_generate(prompt: Optional[str], source_image: Optional[ValidatedImage]) -> bytes:
     if source_image:
         return source_image.normalized_png
     image = Image.new("RGB", (256, 256), color=(242, 245, 249))
@@ -341,7 +343,7 @@ def record_response(
     request_id: str,
     checks: list[CheckResult],
     decision,
-    artifact_id: str | None,
+    artifact_id: Optional[str],
     hashes: dict[str, str],
     errors: list[str],
     passport=None,
@@ -382,12 +384,12 @@ def append_decision_audit(
     request_id: str,
     checks: list[CheckResult],
     decision,
-    artifact_id: str | None,
+    artifact_id: Optional[str],
     hashes: dict[str, str],
     errors: list[str],
     policy_version: str,
     detector_versions: dict[str, str],
-    passport_digest: str | None,
+    passport_digest: Optional[str],
 ) -> None:
     audit.append(
         {
@@ -410,4 +412,4 @@ def append_decision_audit(
 
 
 def now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()

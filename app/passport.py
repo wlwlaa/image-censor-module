@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from app.schemas import SafetyPassport, Verdict
 
@@ -33,7 +33,7 @@ class PassportService:
             policy_version=policy_version,
             detector_versions=detector_versions,
             verdict=verdict,
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             signature="",
         )
         passport.signature = self._sign(passport)

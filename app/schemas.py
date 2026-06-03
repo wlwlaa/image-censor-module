@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +37,7 @@ class CheckResult(BaseModel):
     severity: Severity = Severity.NONE
     reason: str
     details: dict[str, Any] = Field(default_factory=dict)
-    error: str | None = None
+    error: Optional[str] = None
 
 
 class PolicyDecision(BaseModel):
@@ -63,8 +63,7 @@ class ModerationResponse(BaseModel):
     categories: list[str]
     severity: Severity
     reason: str
-    artifact_id: str | None = None
-    passport: SafetyPassport | None = None
+    artifact_id: Optional[str] = None
+    passport: Optional[SafetyPassport] = None
     checks: list[CheckResult]
     errors: list[str] = Field(default_factory=list)
-

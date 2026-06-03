@@ -18,6 +18,9 @@ const downloadMessage = document.querySelector("#download-message");
 const socPanel = document.querySelector(".soc-panel");
 const socEmpty = document.querySelector("#soc-empty");
 const socBody = document.querySelector("#soc-body");
+const apiDemoImage = document.querySelector("#api-demo-image");
+const apiDemoButton = document.querySelector("#api-demo-button");
+const apiDemoResult = document.querySelector("#api-demo-result");
 
 // ===== State =====
 let activePreset = "safe";
@@ -133,6 +136,10 @@ function setDownloadMessage(text = "", state = "") {
 function setDecisionState(state = "") {
   decisionPanel.classList.toggle("state-allow", state === "allow");
   decisionPanel.classList.toggle("state-block", state === "block");
+}
+function setApiDemoResult(payload, state = "") {
+  apiDemoResult.className = `api-demo-result${state ? ` ${state}` : ""}`;
+  apiDemoResult.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 }
 function updateFileLabels() {
   document.querySelector("#input-file-name").textContent = inputImage.files[0]?.name || presetInputFile?.name || "не выбран";
@@ -458,6 +465,30 @@ form.addEventListener("submit", async event => {
   } finally {
     submitButton.disabled = false;
     submitButton.innerHTML = "Проверить <b>→</b>";
+  }
+});
+
+apiDemoButton.addEventListener("click", async () => {
+  const file = apiDemoImage.files[0];
+  if (!file) {
+    setApiDemoResult("Выберите изображение для API demo.", "error");
+    return;
+  }
+  apiDemoButton.disabled = true;
+  apiDemoButton.textContent = "API…";
+  setApiDemoResult("Проверка…");
+  const body = new FormData();
+  body.append("file", file, file.name);
+  try {
+    const response = await fetch("/upload-image", { method: "POST", body });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Сбой API demo"}`);
+    setApiDemoResult(payload, payload.status === "success" ? "success" : payload.status === "unavailable" ? "" : "error");
+  } catch (e) {
+    setApiDemoResult(e.message, "error");
+  } finally {
+    apiDemoButton.disabled = false;
+    apiDemoButton.textContent = "Проверить API";
   }
 });
 

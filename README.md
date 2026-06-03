@@ -15,6 +15,10 @@ metadata contains markers such as `unsafe`, `violence`, `gore`, or `pii`.
 The MVP PII adapter scans filenames and metadata. It is not a production OCR
 engine. See [architecture](docs/architecture.md) for the replacement points.
 
+The optional API demo adds `/upload-image` and `/llama-guard/check-image` with
+OCR, perturbation heuristics, and OpenRouter Llama Guard 4. Heavy ML packages
+are isolated in `requirements-api-demo.txt`; the base demo starts without them.
+
 ## Quick start
 
 ```bash
@@ -30,6 +34,16 @@ uvicorn app.main:create_app --factory --reload
 
 The application fails during factory creation if either required secret is
 missing or shorter than 32 characters.
+
+`OPENROUTER_API_KEY` is optional for quick start. If it is missing, the Llama
+Guard endpoint returns:
+
+```json
+{
+  "status": "unavailable",
+  "reason": "OPENROUTER_API_KEY is not configured"
+}
+```
 
 Open the demo frontend:
 
@@ -116,6 +130,39 @@ Health check:
 curl -sS http://127.0.0.1:8000/health
 ```
 
+API demo image moderation:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/upload-image \
+  -F 'file=@example.jpg'
+```
+
+Direct Llama Guard image check:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/llama-guard/check-image \
+  -F 'file=@example.jpg'
+```
+
+## Full API demo mode
+
+Install optional OCR and perturbation detector dependencies:
+
+```bash
+pip install -r requirements.txt -r requirements-api-demo.txt
+```
+
+Set OpenRouter variables in `.env`:
+
+```bash
+OPENROUTER_API_KEY=<your-key>
+LLAMA_GUARD_MODEL=meta-llama/llama-guard-4-12b
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+OPENROUTER_SITE_URL=
+OPENROUTER_APP_NAME=GenSecOps API Demo
+LLAMA_GUARD_TIMEOUT_SECONDS=30
+```
+
 ## Test
 
 ```bash
@@ -147,6 +194,12 @@ pytest
 | `GENSECOPS_MAX_UPLOAD_BYTES` | Per-file upload limit |
 | `GENSECOPS_MAX_REQUEST_BYTES` | Multipart request body limit |
 | `GENSECOPS_MAX_PIXELS` | Decoded image pixel limit |
+| `OPENROUTER_API_KEY` | Optional OpenRouter API key for `/llama-guard/check-image` |
+| `LLAMA_GUARD_MODEL` | Optional model name, default `meta-llama/llama-guard-4-12b` |
+| `OPENROUTER_BASE_URL` | Optional OpenRouter chat completions URL |
+| `OPENROUTER_SITE_URL` | Optional OpenRouter referer metadata |
+| `OPENROUTER_APP_NAME` | Optional OpenRouter app title metadata |
+| `LLAMA_GUARD_TIMEOUT_SECONDS` | Optional Llama Guard request timeout |
 
 ## Implemented vs roadmap
 
