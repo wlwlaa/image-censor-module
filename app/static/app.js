@@ -21,11 +21,14 @@ const socBody = document.querySelector("#soc-body");
 const apiDemoImage = document.querySelector("#api-demo-image");
 const apiDemoButton = document.querySelector("#api-demo-button");
 const apiDemoResult = document.querySelector("#api-demo-result");
-const datasetLoadButton = document.querySelector("#dataset-load-button");
 const datasetDemoButton = document.querySelector("#dataset-demo-button");
 const datasetProgress = document.querySelector("#dataset-progress");
 const datasetResults = document.querySelector("#dataset-results");
 const datasetSummary = document.querySelector("#dataset-summary");
+const datasetCurrentCase = document.querySelector("#dataset-current-case");
+const datasetCurrentExpected = document.querySelector("#dataset-current-expected");
+const datasetCurrentActual = document.querySelector("#dataset-current-actual");
+const datasetCurrentResult = document.querySelector("#dataset-current-result");
 
 // ===== State =====
 let activePreset = "safe";
@@ -99,6 +102,70 @@ const DETECTOR_LABELS = {
   ocr_pii_guard: "PII-анализ",
   output_guard: "проверка результата",
 };
+
+// ===== Backend API client =====
+function userMessage(value) {
+  const text = String(value || "");
+  if (!text) return "Backend вернул ошибку.";
+  if (text.includes("Failed to fetch") || text.includes("NetworkError")) return "Backend недоступен.";
+  if (text.includes("manifest.json")) return "Manifest датасета некорректен.";
+  if (text.includes("Dataset file not found")) return "Файл из manifest не найден.";
+  if (text.includes("OPENROUTER_API_KEY is not configured")) return "API demo unavailable: OPENROUTER_API_KEY is not configured";
+  if (text.includes("No module named") || text.includes("not installed")) return "Heavy dependencies are not installed.";
+  return text;
+}
+
+async function parseJson(response) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(userMessage(payload.detail || payload.reason || `HTTP ${response.status}`));
+  }
+  return payload;
+}
+
+async function apiGetDataset() {
+  try {
+    return parseJson(await fetch("/demo-dataset"));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
+
+async function apiRunDataset() {
+  try {
+    return parseJson(await fetch("/demo-dataset/run", { method: "POST" }));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
+
+async function apiModerate(formData) {
+  try {
+    return parseJson(await fetch("/v1/moderate", { method: "POST", body: formData }));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
+
+async function apiUploadImage(file) {
+  const body = new FormData();
+  body.append("file", file, file.name);
+  try {
+    return parseJson(await fetch("/upload-image", { method: "POST", body }));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
+
+async function apiCheckLlamaGuard(file) {
+  const body = new FormData();
+  body.append("file", file, file.name);
+  try {
+    return parseJson(await fetch("/llama-guard/check-image", { method: "POST", body }));
+  } catch (error) {
+    throw new Error(userMessage(error.message));
+  }
+}
 
 // ===== Helpers =====
 function pngFile(name) {
@@ -461,10 +528,7 @@ form.addEventListener("submit", async event => {
   if (actualGenerated) body.append("generated_image", actualGenerated, actualGenerated.name);
 
   try {
-    const response = await fetch("/v1/moderate", { method: "POST", body });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Сбой проверки"}`);
-    showPayload(payload);
+    showPayload(await apiModerate(body));
   } catch (e) {
     showError(e.message);
   } finally {
@@ -474,8 +538,9 @@ form.addEventListener("submit", async event => {
 });
 
 function renderDatasetRows(rows) {
-  datasetResults.innerHTML = rows.map(item => `
+  datasetResults.innerHTML = rows.map((item, index) => `
     <tr class="${item.passed ? "pass" : "fail"}">
+      <td>${index + 1}</td>
       <td>${esc(item.title)}</td>
       <td>${esc(item.expected_decision)}</td>
       <td>${esc(item.actual_decision)}</td>
@@ -490,69 +555,71 @@ function sleep(ms) {
 }
 
 async function loadDatasetManifest() {
-  datasetLoadButton.disabled = true;
-  datasetProgress.textContent = "загрузка manifest";
+  datasetProgress.textContent = "Загрузка manifest";
   try {
-    const response = await fetch("/demo-dataset");
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Не удалось загрузить датасет"}`);
-    datasetResults.innerHTML = (payload.cases || []).map(item => `
+    const payload = await apiGetDataset();
+    datasetResults.innerHTML = (payload.cases || []).map((item, index) => `
       <tr>
+        <td>${index + 1}</td>
         <td>${esc(item.title)}</td>
         <td>${esc(item.expected_decision)}</td>
         <td>—</td>
         <td>—</td>
         <td title="${esc(item.description)}">${esc(item.description || "ожидает запуска")}</td>
       </tr>
-    `).join("") || `<tr><td colspan="5">manifest пуст</td></tr>`;
-    datasetProgress.textContent = `загружено: ${payload.count || 0} кейсов`;
-    datasetSummary.textContent = "ожидает запуска";
+    `).join("") || `<tr><td colspan="6">manifest пуст</td></tr>`;
+    datasetProgress.textContent = `Готово: ${payload.count || 0} кейсов`;
+    datasetSummary.textContent = "Ожидает запуска";
+    datasetSummary.dataset.state = "";
     return payload;
   } catch (e) {
-    datasetProgress.textContent = `ошибка: ${e.message}`;
-    datasetSummary.textContent = "FAIL";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="5">${esc(e.message)}</td></tr>`;
+    datasetProgress.textContent = `Ошибка: ${e.message}`;
+    datasetSummary.textContent = "Автодемо завершено: FAIL";
+    datasetSummary.dataset.state = "fail";
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
     throw e;
-  } finally {
-    datasetLoadButton.disabled = false;
   }
 }
 
-datasetLoadButton.addEventListener("click", () => {
-  loadDatasetManifest().catch(() => {});
-});
-
 datasetDemoButton.addEventListener("click", async () => {
   datasetDemoButton.disabled = true;
-  datasetLoadButton.disabled = true;
-  datasetDemoButton.textContent = "Автодемо…";
-  datasetSummary.textContent = "выполняется";
+  datasetDemoButton.textContent = "Автодемо выполняется…";
+  datasetSummary.textContent = "Автодемо выполняется";
+  datasetSummary.dataset.state = "";
+  datasetCurrentCase.textContent = "—";
+  datasetCurrentExpected.textContent = "—";
+  datasetCurrentActual.textContent = "—";
+  datasetCurrentResult.textContent = "—";
+  datasetCurrentResult.dataset.state = "";
   try {
     const info = await loadDatasetManifest();
-    datasetLoadButton.disabled = true;
-    datasetProgress.textContent = `шаг 0/${info.count || 0}`;
+    datasetProgress.textContent = `Шаг 0/${info.count || 0}`;
 
-    const response = await fetch("/demo-dataset/run", { method: "POST" });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Сбой автодемо"}`);
+    const payload = await apiRunDataset();
 
     const rows = [];
     for (const item of payload.results || []) {
       rows.push(item);
       renderDatasetRows(rows);
-      datasetProgress.textContent = `шаг ${rows.length}/${payload.count}`;
+      datasetProgress.textContent = `Шаг ${rows.length}/${payload.count}`;
+      datasetCurrentCase.textContent = item.title || "—";
+      datasetCurrentExpected.textContent = item.expected_decision || "—";
+      datasetCurrentActual.textContent = item.actual_decision || "—";
+      datasetCurrentResult.textContent = item.passed ? "PASS" : "FAIL";
+      datasetCurrentResult.dataset.state = item.passed ? "pass" : "fail";
       await sleep(1200);
     }
-    datasetProgress.textContent = `готово: ${payload.passed}/${payload.count} PASS`;
-    datasetSummary.textContent = payload.passed === payload.count ? "PASS" : "FAIL";
+    datasetProgress.textContent = `Готово: ${payload.count}/${payload.count}`;
+    datasetSummary.textContent = `Автодемо завершено: ${payload.passed}/${payload.count} PASS`;
+    datasetSummary.dataset.state = payload.passed === payload.count ? "pass" : "fail";
   } catch (e) {
-    datasetProgress.textContent = `ошибка: ${e.message}`;
-    datasetSummary.textContent = "FAIL";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="5">${esc(e.message)}</td></tr>`;
+    datasetProgress.textContent = `Ошибка: ${e.message}`;
+    datasetSummary.textContent = "Автодемо завершено: FAIL";
+    datasetSummary.dataset.state = "fail";
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
   } finally {
     datasetDemoButton.disabled = false;
-    datasetLoadButton.disabled = false;
-    datasetDemoButton.textContent = "▶ Запустить автодемо";
+    datasetDemoButton.textContent = "▶ Запустить автодемо по датасету";
   }
 });
 
@@ -565,13 +632,11 @@ apiDemoButton.addEventListener("click", async () => {
   apiDemoButton.disabled = true;
   apiDemoButton.textContent = "API…";
   setApiDemoResult("Проверка…");
-  const body = new FormData();
-  body.append("file", file, file.name);
   try {
-    const response = await fetch("/upload-image", { method: "POST", body });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Сбой API demo"}`);
-    setApiDemoResult(payload, payload.status === "success" ? "success" : payload.status === "unavailable" ? "" : "error");
+    const upload = await apiUploadImage(file);
+    const llamaGuard = await apiCheckLlamaGuard(file);
+    const state = upload.status === "success" ? "success" : upload.status === "unavailable" || llamaGuard.status === "unavailable" ? "" : "error";
+    setApiDemoResult({ upload_image: upload, llama_guard_check_image: llamaGuard }, state);
   } catch (e) {
     setApiDemoResult(e.message, "error");
   } finally {
