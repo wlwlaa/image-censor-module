@@ -179,14 +179,29 @@
             <li><span class="dot-red"></span>Дипфейки сотрудников</li>
             <li><span class="dot-red"></span>Фишинговые материалы</li>
           </ul>
-          <div class="api-demo-box">
+          <div class="dataset-demo-box">
+            <button class="primary-ghost dataset-load-button" id="dataset-load-button" type="button">Загрузить датасет</button>
+            <button class="primary-ghost dataset-demo-button" id="dataset-demo-button" type="button">▶ Запустить автодемо</button>
+            <div class="dataset-progress" id="dataset-progress">готово к запуску</div>
+            <table class="dataset-table">
+              <thead>
+                <tr><th>Сценарий</th><th>Expected</th><th>Actual</th><th>PASS</th><th>Reason</th></tr>
+              </thead>
+              <tbody id="dataset-results">
+                <tr><td colspan="5">результаты появятся после запуска</td></tr>
+              </tbody>
+            </table>
+            <div class="dataset-summary" id="dataset-summary">—</div>
+          </div>
+          <details class="manual-api-box">
+            <summary>Ручная API-проверка</summary>
             <label class="upload api-upload">
               <span>API demo / Llama Guard</span>
               <input id="api-demo-image" type="file" accept="image/png,image/jpeg,image/webp">
             </label>
             <button class="primary-ghost api-demo-button" id="api-demo-button" type="button">Проверить API</button>
             <pre class="api-demo-result" id="api-demo-result">—</pre>
-          </div>
+          </details>
         </article>
       </section>
     </main>

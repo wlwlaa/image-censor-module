@@ -379,20 +379,65 @@ textarea:focus, input[type="password"]:focus { border-color: var(--red); backgro
 }
 .protect-list li:last-child { grid-column: 1 / -1; }
 .dot-red { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--red); }
-.api-demo-box {
+.dataset-demo-box {
   min-height: 0;
   padding: 0 13px 12px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 7px;
 }
-.api-upload { padding: 5px 7px; }
-.api-demo-button { min-height: 31px; flex: 0 0 auto; white-space: nowrap; }
-.api-demo-result {
+.dataset-load-button, .dataset-demo-button { min-height: 31px; }
+.dataset-demo-button { color: #fff; background: var(--red); border-color: var(--red); }
+.dataset-demo-button:hover:not(:disabled) { background: var(--red-deep); }
+.dataset-progress {
   grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+}
+.dataset-table {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 88px;
+  display: block;
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+  border-spacing: 0;
+  font-size: 9px;
+}
+.dataset-table thead, .dataset-table tbody, .dataset-table tr { width: 100%; display: table; table-layout: fixed; }
+.dataset-table th, .dataset-table td { padding: 4px 5px; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.dataset-table th { color: var(--muted); font-weight: 900; text-transform: uppercase; }
+.dataset-table td { border-top: 1px solid var(--line-soft); color: var(--ink-2); }
+.dataset-table tr.pass td:nth-child(4) { color: var(--green); font-weight: 900; }
+.dataset-table tr.fail td:nth-child(4), .dataset-table tr.fail td { color: var(--red); font-weight: 800; }
+.dataset-summary {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-align: right;
+}
+.manual-api-box {
+  margin: 0 13px 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.manual-api-box summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+.manual-api-box .upload { margin-top: 7px; }
+.api-upload { padding: 5px 7px; }
+.api-demo-button { width: 100%; min-height: 31px; margin-top: 7px; }
+.api-demo-result {
   min-height: 38px;
   max-height: 58px;
-  margin: 0;
+  margin: 7px 0 0;
   padding: 7px;
   overflow: auto;
   border: 1px solid var(--line-soft);
@@ -477,7 +522,12 @@ textarea:focus, input[type="password"]:focus { border-color: var(--red); backgro
   .protect-list { padding: 6px 9px 4px; gap: 4px; }
   .protect-list li { padding: 5px 6px; gap: 6px; font-size: 9px; }
   .dot-red { width: 5px; height: 5px; }
-  .api-demo-box { padding: 0 9px 8px; gap: 4px; }
+  .dataset-demo-box { padding: 0 9px 8px; gap: 4px; }
+  .dataset-load-button, .dataset-demo-button { min-height: 25px; font-size: 8px; }
+  .dataset-progress, .dataset-table, .dataset-summary { font-size: 8px; }
+  .dataset-table { max-height: 44px; }
+  .dataset-table th, .dataset-table td { padding: 3px 4px; }
+  .manual-api-box { margin: 0 9px 8px; font-size: 8px; }
   .api-upload { padding: 3px 5px; }
   .api-demo-button { min-height: 25px; font-size: 8px; }
   .api-demo-result { min-height: 28px; max-height: 38px; padding: 4px; font-size: 8px; }

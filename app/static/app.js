@@ -21,6 +21,11 @@ const socBody = document.querySelector("#soc-body");
 const apiDemoImage = document.querySelector("#api-demo-image");
 const apiDemoButton = document.querySelector("#api-demo-button");
 const apiDemoResult = document.querySelector("#api-demo-result");
+const datasetLoadButton = document.querySelector("#dataset-load-button");
+const datasetDemoButton = document.querySelector("#dataset-demo-button");
+const datasetProgress = document.querySelector("#dataset-progress");
+const datasetResults = document.querySelector("#dataset-results");
+const datasetSummary = document.querySelector("#dataset-summary");
 
 // ===== State =====
 let activePreset = "safe";
@@ -465,6 +470,89 @@ form.addEventListener("submit", async event => {
   } finally {
     submitButton.disabled = false;
     submitButton.innerHTML = "Проверить <b>→</b>";
+  }
+});
+
+function renderDatasetRows(rows) {
+  datasetResults.innerHTML = rows.map(item => `
+    <tr class="${item.passed ? "pass" : "fail"}">
+      <td>${esc(item.title)}</td>
+      <td>${esc(item.expected_decision)}</td>
+      <td>${esc(item.actual_decision)}</td>
+      <td>${item.passed ? "PASS" : "FAIL"}</td>
+      <td title="${esc(item.reason)}">${esc(reasonLabel(item.reason))}</td>
+    </tr>
+  `).join("");
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function loadDatasetManifest() {
+  datasetLoadButton.disabled = true;
+  datasetProgress.textContent = "загрузка manifest";
+  try {
+    const response = await fetch("/demo-dataset");
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Не удалось загрузить датасет"}`);
+    datasetResults.innerHTML = (payload.cases || []).map(item => `
+      <tr>
+        <td>${esc(item.title)}</td>
+        <td>${esc(item.expected_decision)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td title="${esc(item.description)}">${esc(item.description || "ожидает запуска")}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5">manifest пуст</td></tr>`;
+    datasetProgress.textContent = `загружено: ${payload.count || 0} кейсов`;
+    datasetSummary.textContent = "ожидает запуска";
+    return payload;
+  } catch (e) {
+    datasetProgress.textContent = `ошибка: ${e.message}`;
+    datasetSummary.textContent = "FAIL";
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="5">${esc(e.message)}</td></tr>`;
+    throw e;
+  } finally {
+    datasetLoadButton.disabled = false;
+  }
+}
+
+datasetLoadButton.addEventListener("click", () => {
+  loadDatasetManifest().catch(() => {});
+});
+
+datasetDemoButton.addEventListener("click", async () => {
+  datasetDemoButton.disabled = true;
+  datasetLoadButton.disabled = true;
+  datasetDemoButton.textContent = "Автодемо…";
+  datasetSummary.textContent = "выполняется";
+  try {
+    const info = await loadDatasetManifest();
+    datasetLoadButton.disabled = true;
+    datasetProgress.textContent = `шаг 0/${info.count || 0}`;
+
+    const response = await fetch("/demo-dataset/run", { method: "POST" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`HTTP ${response.status}. ${payload.detail || "Сбой автодемо"}`);
+
+    const rows = [];
+    for (const item of payload.results || []) {
+      rows.push(item);
+      renderDatasetRows(rows);
+      datasetProgress.textContent = `шаг ${rows.length}/${payload.count}`;
+      await sleep(1200);
+    }
+    datasetProgress.textContent = `готово: ${payload.passed}/${payload.count} PASS`;
+    datasetSummary.textContent = payload.passed === payload.count ? "PASS" : "FAIL";
+  } catch (e) {
+    datasetProgress.textContent = `ошибка: ${e.message}`;
+    datasetSummary.textContent = "FAIL";
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="5">${esc(e.message)}</td></tr>`;
+  } finally {
+    datasetDemoButton.disabled = false;
+    datasetLoadButton.disabled = false;
+    datasetDemoButton.textContent = "▶ Запустить автодемо";
   }
 });
 

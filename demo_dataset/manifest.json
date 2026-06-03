@@ -1,0 +1,18 @@
+[
+  {
+    "id": "case-001",
+    "title": "Безопасное изображение",
+    "input": "demo_dataset/case001_input.png",
+    "generated": "demo_dataset/case001_generated.png",
+    "expected_decision": "ALLOW",
+    "description": "Безопасный кейс"
+  },
+  {
+    "id": "case-002",
+    "title": "PII / документ mock",
+    "input": "demo_dataset/case002_input.png",
+    "generated": "demo_dataset/case002_generated.png",
+    "expected_decision": "BLOCK",
+    "description": "Синтетический mock-документ, не реальные данные"
+  }
+]

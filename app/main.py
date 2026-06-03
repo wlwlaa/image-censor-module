@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hmac
 import io
+import json
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -68,11 +70,10 @@ def create_app(
     def demo_ui() -> FileResponse:
         return FileResponse(static_dir / "index.html")
 
-    @app.post("/v1/moderate", response_model=ModerationResponse)
-    async def moderate(
-        prompt: Annotated[Optional[str], Form()] = None,
-        input_image: Annotated[Optional[UploadFile], File()] = None,
-        generated_image: Annotated[Optional[UploadFile], File()] = None,
+    async def run_moderation(
+        prompt: Optional[str],
+        input_image: Optional[Any],
+        generated_image: Optional[Any],
     ) -> ModerationResponse:
         request_id = uuid.uuid4().hex
         artifact_id: Optional[str] = None
@@ -217,6 +218,69 @@ def create_app(
             write_audit=passport is None and not decision_audit_attempted,
         )
 
+    @app.post("/v1/moderate", response_model=ModerationResponse)
+    async def moderate(
+        prompt: Annotated[Optional[str], Form()] = None,
+        input_image: Annotated[Optional[UploadFile], File()] = None,
+        generated_image: Annotated[Optional[UploadFile], File()] = None,
+    ) -> ModerationResponse:
+        return await run_moderation(prompt=prompt, input_image=input_image, generated_image=generated_image)
+
+    @app.get("/demo-dataset")
+    def get_demo_dataset() -> dict[str, Any]:
+        dataset_dir = demo_dataset_dir()
+        cases = load_demo_manifest(dataset_dir)
+        return {
+            "count": len(cases),
+            "cases": [public_demo_case(case, dataset_dir) for case in cases],
+        }
+
+    @app.post("/demo-dataset/run")
+    async def run_demo_dataset() -> dict[str, Any]:
+        dataset_dir = demo_dataset_dir()
+        cases = load_demo_manifest(dataset_dir)
+        results = []
+
+        for case in cases:
+            expected = str(case.get("expected_decision", "")).upper()
+            try:
+                input_upload = build_demo_upload(case.get("input"), dataset_dir)
+                generated_upload = build_demo_upload(case.get("generated"), dataset_dir)
+                response = await run_moderation(
+                    prompt=case.get("prompt"),
+                    input_image=input_upload,
+                    generated_image=generated_upload,
+                )
+                actual = response.verdict.value
+                result = {
+                    "id": case["id"],
+                    "title": case["title"],
+                    "expected_decision": expected,
+                    "actual_decision": actual,
+                    "passed": actual == expected,
+                    "reason": response.reason,
+                    "artifact_id": response.artifact_id,
+                    "passport": response.passport.model_dump(mode="json") if response.passport else None,
+                }
+            except Exception as exc:
+                result = {
+                    "id": case.get("id", "unknown"),
+                    "title": case.get("title", "Unknown case"),
+                    "expected_decision": expected,
+                    "actual_decision": "ERROR",
+                    "passed": False,
+                    "reason": str(exc),
+                    "artifact_id": None,
+                    "passport": None,
+                }
+            results.append(result)
+
+        return {
+            "count": len(results),
+            "passed": sum(1 for item in results if item["passed"]),
+            "results": results,
+        }
+
     @app.get("/v1/download/{artifact_id}")
     def download(
         artifact_id: str,
@@ -272,6 +336,101 @@ def create_app(
         )
 
     return app
+
+
+class InMemoryUpload:
+    def __init__(self, *, filename: str, content_type: str, content: bytes) -> None:
+        self.filename = filename
+        self.content_type = content_type
+        self._content = content
+
+    async def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            return self._content
+        return self._content[:size]
+
+
+def demo_dataset_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "demo_dataset"
+
+
+def load_demo_manifest(dataset_dir: Path) -> list[dict[str, Any]]:
+    manifest_path = dataset_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="demo_dataset/manifest.json not found")
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid demo_dataset/manifest.json: {exc}") from exc
+
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=400, detail="demo_dataset/manifest.json must contain a JSON array")
+
+    cases = []
+    for index, item in enumerate(payload, start=1):
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail=f"Dataset case #{index} must be an object")
+        if not item.get("id") or not item.get("title") or not item.get("expected_decision"):
+            raise HTTPException(status_code=400, detail=f"Dataset case #{index} is missing id, title, or expected_decision")
+        if not item.get("input") and not item.get("generated") and not item.get("prompt"):
+            raise HTTPException(status_code=400, detail=f"Dataset case {item['id']} has no input, generated, or prompt")
+        cases.append(item)
+    return cases
+
+
+def public_demo_case(case: dict[str, Any], dataset_dir: Path) -> dict[str, Any]:
+    return {
+        "id": case["id"],
+        "title": case["title"],
+        "input": case.get("input"),
+        "generated": case.get("generated"),
+        "expected_decision": str(case["expected_decision"]).upper(),
+        "description": case.get("description", ""),
+        "input_exists": demo_file_exists(case.get("input"), dataset_dir),
+        "generated_exists": demo_file_exists(case.get("generated"), dataset_dir),
+    }
+
+
+def demo_file_exists(raw_path: Optional[str], dataset_dir: Path) -> bool:
+    if not raw_path:
+        return False
+    try:
+        return resolve_demo_file(raw_path, dataset_dir).exists()
+    except HTTPException:
+        return False
+
+
+def build_demo_upload(raw_path: Optional[str], dataset_dir: Path) -> Optional[InMemoryUpload]:
+    if not raw_path:
+        return None
+    path = resolve_demo_file(raw_path, dataset_dir)
+    if not path.exists() or not path.is_file():
+        raise ValueError(f"Dataset file not found: {raw_path}")
+    content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    if not content_type.startswith("image/"):
+        raise ValueError(f"Dataset file is not an image: {raw_path}")
+    return InMemoryUpload(filename=path.name, content_type=content_type, content=path.read_bytes())
+
+
+def resolve_demo_file(raw_path: str, dataset_dir: Path) -> Path:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise HTTPException(status_code=400, detail="Dataset file path must be a non-empty string")
+
+    relative = Path(raw_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise HTTPException(status_code=400, detail="Dataset file path must stay inside demo_dataset/")
+
+    if relative.parts and relative.parts[0] == "demo_dataset":
+        candidate = dataset_dir.parent / relative
+    else:
+        candidate = dataset_dir / relative
+
+    resolved_dataset_dir = dataset_dir.resolve()
+    resolved = candidate.resolve()
+    if resolved != resolved_dataset_dir and resolved_dataset_dir not in resolved.parents:
+        raise HTTPException(status_code=400, detail="Dataset file path escapes demo_dataset/")
+    return resolved
 
 
 async def validate_upload(

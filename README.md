@@ -93,6 +93,35 @@ data/release/
 data/audit/audit.jsonl
 ```
 
+## Local dataset auto demo
+
+For defense, put your own `.png`, `.jpg`, or `.jpeg` files into
+`demo_dataset/` and edit `demo_dataset/manifest.json`.
+
+Each manifest item declares the files and expected decision:
+
+```json
+{
+  "id": "case-001",
+  "title": "Безопасное изображение",
+  "input": "demo_dataset/case001_input.png",
+  "generated": "demo_dataset/case001_generated.png",
+  "expected_decision": "ALLOW",
+  "description": "Безопасный кейс"
+}
+```
+
+Use `expected_decision` as `ALLOW` or `BLOCK`. The backend reads only files
+inside `demo_dataset/`; `../` and absolute paths are rejected.
+
+On defense, open `/` and click `▶ Запустить автодемо` in the
+`Автодемо по датасету` block. The run uses the same moderation logic as
+`/v1/moderate` and shows expected vs actual decisions with PASS/FAIL summary.
+
+The included images are synthetic placeholders only. The mock document is
+explicitly marked `SYNTHETIC MOCK / NOT A REAL DOCUMENT`; it is not production
+ML and contains no real passport, card, face, or PII data.
+
 ## API examples
 
 Safe mock generation:
@@ -142,6 +171,18 @@ Direct Llama Guard image check:
 ```bash
 curl -sS -X POST http://127.0.0.1:8000/llama-guard/check-image \
   -F 'file=@example.jpg'
+```
+
+Load local dataset manifest:
+
+```bash
+curl -sS http://127.0.0.1:8000/demo-dataset
+```
+
+Run local dataset auto demo:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/demo-dataset/run
 ```
 
 ## Full API demo mode
