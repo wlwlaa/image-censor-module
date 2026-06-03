@@ -28,21 +28,22 @@
       <section class="hero">
         <div class="hero-title">
           <h1>GenSecOps · <strong>AI Security Gateway</strong></h1>
-          <p class="hero-sub">Независимый банковский контур допуска и контроля GenAI-артефактов.</p>
+          <p class="hero-sub">Независимый контур допуска GenAI-артефактов.</p>
         </div>
         <p class="killer">
           Генератор считается <b>недоверенным компонентом</b>.<br>
-          Ни одно изображение не может попасть клиенту банка без независимой проверки и подписанного паспорта безопасности.
+          Выдача только после независимой проверки и подписанного паспорта безопасности.
         </p>
       </section>
 
+      <!-- AUTODEMO PANEL -->
       <section class="dataset-demo-panel">
         <div class="dataset-demo-title">
           <p class="eyebrow">Автодемо по датасету</p>
-          <span>Локальные изображения проходят через backend AI Security Gateway.</span>
+          <span>demo_dataset/manifest.json · ручные поля не влияют</span>
         </div>
-        <label class="dataset-upload-button">
-          Загрузить свой датасет
+        <label class="dataset-upload-button" title="Положите изображения в demo_dataset/ и пропишите manifest.json">
+          Загрузить manifest/датасет
           <input id="dataset-upload-input" type="file" accept=".json,image/png,image/jpeg" webkitdirectory directory multiple>
         </label>
         <button class="dataset-demo-button" id="dataset-demo-button" type="button">▶ Запустить автодемо</button>
@@ -69,21 +70,21 @@
         </div>
       </section>
 
-      <!-- ARCHITECTURE STRIP -->
+      <!-- PIPELINE -->
       <section class="pipeline" id="pipeline">
         <div class="pipe-node" data-step="user"><span class="pipe-index">01</span><span class="pipe-copy"><strong>Запрос</strong><small>клиент банка</small></span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="prompt"><span class="pipe-index">02</span><span class="pipe-copy"><strong>Проверка запроса</strong><small>анализ запроса</small></span></div>
+        <div class="pipe-node" data-step="prompt"><span class="pipe-index">02</span><span class="pipe-copy"><strong>Prompt Guard</strong><small>анализ запроса</small></span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="input"><span class="pipe-index">03</span><span class="pipe-copy"><strong>Проверка изображения</strong><small>PII / документ</small></span></div>
+        <div class="pipe-node" data-step="input"><span class="pipe-index">03</span><span class="pipe-copy"><strong>Image Guard</strong><small>PII / документ</small></span></div>
         <div class="pipe-arrow"></div>
         <div class="pipe-node" data-step="generator"><span class="pipe-index">04</span><span class="pipe-copy"><strong>Генератор</strong><small>недоверенный</small></span></div>
         <div class="pipe-arrow"></div>
         <div class="pipe-node" data-step="quarantine"><span class="pipe-index">05</span><span class="pipe-copy"><strong>Карантин</strong><small>изоляция</small></span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="output"><span class="pipe-index">06</span><span class="pipe-copy"><strong>Проверка результата</strong><small>анализ результата</small></span></div>
+        <div class="pipe-node" data-step="output"><span class="pipe-index">06</span><span class="pipe-copy"><strong>Output Scan</strong><small>анализ результата</small></span></div>
         <div class="pipe-arrow"></div>
-        <div class="pipe-node" data-step="policy"><span class="pipe-index">07</span><span class="pipe-copy"><strong>Политика</strong><small>запрет по умолчанию</small></span></div>
+        <div class="pipe-node" data-step="policy"><span class="pipe-index">07</span><span class="pipe-copy"><strong>Политика</strong><small>Fail-closed</small></span></div>
         <div class="pipe-arrow"></div>
         <div class="pipe-node" data-step="passport"><span class="pipe-index">08</span><span class="pipe-copy"><strong>Паспорт</strong><small>HMAC подпись</small></span></div>
         <div class="pipe-arrow"></div>
@@ -96,30 +97,33 @@
         <article class="panel scenarios-panel">
           <div class="panel-head">
             <p class="eyebrow">Сценарии</p>
-            <span class="badge red">ЗАПРЕТ ПО УМОЛЧАНИЮ</span>
+            <span class="badge red">Fail-closed</span>
           </div>
           <div class="cases">
             <button type="button" class="case active" data-preset="safe">Безопасное изображение</button>
             <button type="button" class="case" data-preset="pii">PII / документ</button>
-            <button type="button" class="case" data-preset="unsafe">Опасный результат</button>
+            <button type="button" class="case" data-preset="unsafe">Опасный output</button>
             <button type="button" class="case" data-preset="offline">Цензор недоступен</button>
-            <button type="button" class="case" data-preset="tampered">Подмена файла</button>
           </div>
           <form id="moderation-form">
             <textarea id="prompt" rows="2" placeholder="Описание запроса"></textarea>
-            <div class="upload-grid">
-              <label class="upload">
-                <span>Входное изображение</span>
-                <input id="input-image" type="file" accept="image/png,image/jpeg,image/webp">
-                <small id="input-file-name">не выбран</small>
-              </label>
-              <label class="upload">
-                <span>Сгенерированное</span>
-                <input id="generated-image" type="file" accept="image/png,image/jpeg,image/webp">
-                <small id="generated-file-name">не выбран</small>
-              </label>
-            </div>
-            <input id="token" type="password" autocomplete="off" placeholder="Токен проверенной выдачи">
+            <details class="manual-files-details">
+              <summary>Дополнительные файлы для ручной проверки</summary>
+              <div class="upload-grid">
+                <label class="upload">
+                  <span>Входное изображение</span>
+                  <input id="input-image" type="file" accept="image/png,image/jpeg,image/webp">
+                  <small id="input-file-name">не выбран</small>
+                </label>
+                <label class="upload">
+                  <span>Сгенерированное</span>
+                  <input id="generated-image" type="file" accept="image/png,image/jpeg,image/webp">
+                  <small id="generated-file-name">не выбран</small>
+                </label>
+              </div>
+              <input id="token" type="password" autocomplete="off" placeholder="Токен проверенной выдачи">
+              <p class="manual-hint">Ручной режим — не влияет на автодемо.</p>
+            </details>
             <button class="primary" id="submit-button" type="submit">Проверить <b>→</b></button>
           </form>
         </article>
@@ -131,6 +135,20 @@
             <span class="panel-meta" id="decision-meta">ОЖИДАНИЕ</span>
           </div>
           <div class="decision-body">
+            <div class="preview-row">
+              <div class="preview-block">
+                <div class="preview-label">Входное изображение</div>
+                <div class="image-preview-wrap" id="input-preview-wrap">
+                  <div class="censored-placeholder">нет файла</div>
+                </div>
+              </div>
+              <div class="preview-block">
+                <div class="preview-label">Результат генератора</div>
+                <div class="image-preview-wrap" id="output-preview-wrap">
+                  <div class="censored-placeholder">нет файла</div>
+                </div>
+              </div>
+            </div>
             <h3 class="verdict" id="verdict-text" data-v="EMPTY">—</h3>
             <p class="reason" id="verdict-reason">Выберите сценарий и нажмите «Проверить».</p>
             <div class="chips" id="verdict-chips"></div>
@@ -142,10 +160,10 @@
           </div>
         </article>
 
-        <!-- C. Паспорт -->
+        <!-- C. Safety Passport -->
         <article class="panel passport-panel">
           <div class="panel-head">
-            <p class="eyebrow">Паспорт безопасности</p>
+            <p class="eyebrow">Safety Passport</p>
             <span class="sig" id="pp-signature" data-state="PENDING">ОЖИДАЕТ</span>
           </div>
           <div class="empty-state" id="pp-empty">Паспорт появится после разрешённой проверки.</div>
@@ -170,7 +188,7 @@
             <p class="eyebrow">Событие SOC</p>
             <span class="panel-meta" id="soc-status">НЕТ СОБЫТИЙ</span>
           </div>
-          <div class="empty-state" id="soc-empty">Инцидентов нет. Событие появится при блокировке или нарушении целостности.</div>
+          <div class="empty-state" id="soc-empty">Инцидентов нет.</div>
           <div class="soc-body hidden" id="soc-body">
             <div class="soc-headline">
               <span class="severity-pill" id="soc-severity" data-sev="">—</span>
@@ -184,7 +202,7 @@
           </div>
         </article>
 
-        <!-- Журнал -->
+        <!-- Журнал + результаты автодемо -->
         <article class="panel timeline-panel">
           <div class="panel-head">
             <p class="eyebrow">Журнал проверки</p>
@@ -201,10 +219,10 @@
             <div class="dataset-results-title">Результаты автодемо</div>
             <table class="dataset-table">
               <thead>
-                <tr><th>Сценарий</th><th>Expected</th><th>Actual</th><th>PASS/FAIL</th></tr>
+                <tr><th>#</th><th>Сценарий</th><th>Expected</th><th>Actual</th><th>PASS/FAIL</th><th>Причина</th></tr>
               </thead>
               <tbody id="dataset-results">
-                <tr><td colspan="4">Результаты появятся после запуска</td></tr>
+                <tr><td colspan="6">Результаты появятся после запуска</td></tr>
               </tbody>
             </table>
           </div>
@@ -226,7 +244,7 @@
           <details class="manual-api-box">
             <summary>API demo / Llama Guard</summary>
             <label class="upload api-upload">
-              <span>API demo / Llama Guard</span>
+              <span>Изображение</span>
               <input id="api-demo-image" type="file" accept="image/png,image/jpeg,image/webp">
             </label>
             <button class="primary-ghost api-demo-button" id="api-demo-button" type="button">Проверить API</button>

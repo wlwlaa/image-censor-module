@@ -7,7 +7,6 @@ const inputImage = document.querySelector("#input-image");
 const generatedImage = document.querySelector("#generated-image");
 const tokenInput = document.querySelector("#token");
 const submitButton = document.querySelector("#submit-button");
-const hint = null;
 const exportButton = document.querySelector("#export-passport");
 const downloadButton = document.querySelector("#download-button");
 const decisionMeta = document.querySelector("#decision-meta");
@@ -30,21 +29,24 @@ const datasetCurrentCase = document.querySelector("#dataset-current-case");
 const datasetCurrentExpected = document.querySelector("#dataset-current-expected");
 const datasetCurrentActual = document.querySelector("#dataset-current-actual");
 const datasetCurrentResult = document.querySelector("#dataset-current-result");
+const inputPreviewWrap = document.querySelector("#input-preview-wrap");
+const outputPreviewWrap = document.querySelector("#output-preview-wrap");
 
 // ===== State =====
 let activePreset = "safe";
 let presetInputFile = null;
 let presetGeneratedFile = null;
 let lastPayload = null;
+let inputPreviewSrc = null;
+let outputPreviewSrc = null;
 
-// ===== Preset → backend mapping (existing heuristics, unchanged) =====
+// ===== Preset config =====
 const transparentPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const presetConfig = {
-  safe:     { prompt: "Создать безопасную корпоративную иллюстрацию" },
-  pii:      { input: "passport-card.png" },
-  unsafe:   { generated: "unsafe-content.png" },
-  offline:  { generated: "detector_error.png" },
-  tampered: { prompt: "Создать безопасную корпоративную иллюстрацию" },
+  safe:    { prompt: "Создать безопасную корпоративную иллюстрацию" },
+  pii:     { input: "passport-card.png" },
+  unsafe:  { generated: "unsafe-content.png" },
+  offline: { generated: "detector_error.png" },
 };
 
 const RISK_CATS = {
@@ -70,32 +72,21 @@ const CATEGORY_LABELS = {
   integrity_violation: "Нарушение целостности",
 };
 const REASON_LABELS = {
-  "All mandatory checks passed": "Все обязательные проверки пройдены.",
-  "Potential PII, payment details, or barcode marker detected before provider call": "Обнаружены признаки персональных или платёжных данных до обращения к генератору.",
-  "Mock output detector found an unsafe filename or metadata marker": "При проверке результата обнаружен опасный контент.",
-  "Prompt contains a forbidden content marker": "В запросе обнаружен запрещённый маркер.",
-  "Prompt contains a suspicious bypass marker": "В запросе обнаружена попытка обхода ограничений.",
-  "No security checks were executed": "Проверки безопасности не были выполнены.",
+  "All mandatory checks passed": "Все проверки пройдены.",
+  "Potential PII, payment details, or barcode marker detected before provider call": "PII / платёжные данные — заблокировано до генератора.",
+  "Mock output detector found an unsafe filename or metadata marker": "Опасный контент в результате генератора.",
+  "Prompt contains a forbidden content marker": "Запрещённый маркер в запросе.",
+  "Prompt contains a suspicious bypass marker": "Попытка обхода ограничений.",
+  "No security checks were executed": "Проверки не выполнены.",
 };
 const SEVERITY_LABELS = {
-  NONE: "НЕТ",
-  LOW: "НИЗКИЙ",
-  MEDIUM: "СРЕДНИЙ",
-  HIGH: "ВЫСОКИЙ",
-  CRITICAL: "КРИТИЧЕСКИЙ",
+  NONE: "НЕТ", LOW: "НИЗКИЙ", MEDIUM: "СРЕДНИЙ", HIGH: "ВЫСОКИЙ", CRITICAL: "КРИТИЧЕСКИЙ",
 };
 const VERDICT_LABELS = {
-  ALLOW: "РАЗРЕШЕНО",
-  BLOCK: "ЗАБЛОКИРОВАНО",
-  REVIEW: "НА ПРОВЕРКЕ",
-  OFFLINE: "ЗАПРЕТ ВЫДАЧИ",
-  ERROR: "ОШИБКА",
+  ALLOW: "РАЗРЕШЕНО", BLOCK: "ЗАБЛОКИРОВАНО", REVIEW: "НА ПРОВЕРКЕ", OFFLINE: "ЗАПРЕТ ВЫДАЧИ", ERROR: "ОШИБКА",
 };
 const SIGNATURE_LABELS = {
-  VALID: "ДЕЙСТВИТЕЛЕН",
-  INVALID: "НЕДЕЙСТВИТЕЛЕН",
-  PENDING: "ОЖИДАЕТ",
-  "N/A": "НЕТ",
+  VALID: "ДЕЙСТВИТЕЛЕН", INVALID: "НЕДЕЙСТВИТЕЛЕН", PENDING: "ОЖИДАЕТ", "N/A": "НЕТ",
 };
 const DETECTOR_LABELS = {
   prompt_guard: "проверка запроса",
@@ -104,15 +95,15 @@ const DETECTOR_LABELS = {
   output_guard: "проверка результата",
 };
 
-// ===== Backend API client =====
+// ===== Backend API =====
 function userMessage(value) {
   const text = String(value || "");
   if (!text) return "Backend вернул ошибку.";
   if (text.includes("Failed to fetch") || text.includes("NetworkError")) return "Backend недоступен.";
   if (text.includes("manifest.json")) return "Manifest датасета некорректен.";
   if (text.includes("Dataset file not found")) return "Файл из manifest не найден.";
-  if (text.includes("OPENROUTER_API_KEY is not configured")) return "API demo unavailable: OPENROUTER_API_KEY is not configured";
-  if (text.includes("No module named") || text.includes("not installed")) return "Heavy dependencies are not installed.";
+  if (text.includes("OPENROUTER_API_KEY is not configured")) return "API demo unavailable: OPENROUTER_API_KEY не задан.";
+  if (text.includes("No module named") || text.includes("not installed")) return "Зависимости не установлены.";
   return text;
 }
 
@@ -125,59 +116,34 @@ async function parseJson(response) {
 }
 
 async function apiGetDataset() {
-  try {
-    return parseJson(await fetch("/demo-dataset"));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  try { return parseJson(await fetch("/demo-dataset")); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
-
 async function apiRunDataset() {
-  try {
-    return parseJson(await fetch("/demo-dataset/run", { method: "POST" }));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  try { return parseJson(await fetch("/demo-dataset/run", { method: "POST" })); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
-
 async function apiUploadDataset(files) {
   const body = new FormData();
-  for (const file of files) {
-    body.append("files", file, file.webkitRelativePath || file.name);
-  }
-  try {
-    return parseJson(await fetch("/demo-dataset/upload", { method: "POST", body }));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  for (const file of files) body.append("files", file, file.webkitRelativePath || file.name);
+  try { return parseJson(await fetch("/demo-dataset/upload", { method: "POST", body })); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
-
 async function apiModerate(formData) {
-  try {
-    return parseJson(await fetch("/v1/moderate", { method: "POST", body: formData }));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  try { return parseJson(await fetch("/v1/moderate", { method: "POST", body: formData })); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
-
 async function apiUploadImage(file) {
   const body = new FormData();
   body.append("file", file, file.name);
-  try {
-    return parseJson(await fetch("/upload-image", { method: "POST", body }));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  try { return parseJson(await fetch("/upload-image", { method: "POST", body })); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
-
 async function apiCheckLlamaGuard(file) {
   const body = new FormData();
   body.append("file", file, file.name);
-  try {
-    return parseJson(await fetch("/llama-guard/check-image", { method: "POST", body }));
-  } catch (error) {
-    throw new Error(userMessage(error.message));
-  }
+  try { return parseJson(await fetch("/llama-guard/check-image", { method: "POST", body })); }
+  catch (error) { throw new Error(userMessage(error.message)); }
 }
 
 // ===== Helpers =====
@@ -189,21 +155,23 @@ function esc(v) {
   return String(v ?? "—").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c]);
 }
-function categoryLabel(value) {
-  return CATEGORY_LABELS[value] || "Категория риска";
-}
-function categoriesText(items) {
-  return (items || []).map(categoryLabel).join(", ");
-}
+function categoryLabel(value) { return CATEGORY_LABELS[value] || "Категория риска"; }
+function categoriesText(items) { return (items || []).map(categoryLabel).join(", "); }
 function reasonLabel(value) {
   if (!value) return "Решение сформировано политикой безопасности.";
   if (REASON_LABELS[value]) return REASON_LABELS[value];
   if (value.startsWith("Fail closed:")) return "Выдача запрещена: обязательная проверка недоступна.";
   return "Решение сформировано политикой безопасности.";
 }
-function severityLabel(value) {
-  return SEVERITY_LABELS[value] || value || "—";
+function shortReason(raw) {
+  if (!raw) return "—";
+  const mapped = REASON_LABELS[raw];
+  if (mapped) return mapped.length > 32 ? mapped.slice(0, 30) + "…" : mapped;
+  if (raw.startsWith("Fail closed:")) return "Сбой цензора";
+  if (raw.includes("Dataset file not found")) return "Файл не найден";
+  return raw.length > 32 ? raw.slice(0, 30) + "…" : raw;
 }
+function severityLabel(value) { return SEVERITY_LABELS[value] || value || "—"; }
 function compactValue(value, head = 12, tail = 8) {
   if (!value) return "—";
   const text = String(value);
@@ -230,6 +198,76 @@ function updateFileLabels() {
   document.querySelector("#input-file-name").textContent = inputImage.files[0]?.name || presetInputFile?.name || "не выбран";
   document.querySelector("#generated-file-name").textContent = generatedImage.files[0]?.name || presetGeneratedFile?.name || "не выбран";
 }
+function extractDatasetFilename(path) {
+  if (!path) return null;
+  return path.replace(/^demo_dataset\//, "");
+}
+
+// ===== Preview =====
+function setPreviewPlaceholder(wrapEl, text) {
+  wrapEl.innerHTML = `<div class="censored-placeholder">${esc(text)}</div>`;
+}
+
+function showImageInWrap(wrapEl, src, { blocked = false } = {}) {
+  wrapEl.innerHTML = "";
+  const img = document.createElement("img");
+  img.className = blocked ? "image-preview blurred-preview" : "image-preview";
+  img.src = src;
+  img.alt = "";
+  wrapEl.appendChild(img);
+  if (blocked) {
+    const overlay = document.createElement("div");
+    overlay.className = "blocked-overlay";
+    const badge = document.createElement("span");
+    badge.className = "blocked-overlay-badge";
+    badge.textContent = "BLOCKED";
+    overlay.appendChild(badge);
+    const caption = document.createElement("div");
+    caption.className = "blocked-overlay-caption";
+    caption.textContent = "Скрыто политикой";
+    overlay.appendChild(caption);
+    wrapEl.appendChild(overlay);
+  }
+}
+
+function clearPreviews() {
+  if (inputPreviewSrc && inputPreviewSrc.startsWith("blob:")) URL.revokeObjectURL(inputPreviewSrc);
+  if (outputPreviewSrc && outputPreviewSrc.startsWith("blob:")) URL.revokeObjectURL(outputPreviewSrc);
+  inputPreviewSrc = null;
+  outputPreviewSrc = null;
+  setPreviewPlaceholder(inputPreviewWrap, "нет файла");
+  setPreviewPlaceholder(outputPreviewWrap, "нет файла");
+}
+
+function applyDecisionPreviews(payload) {
+  const verdict = payload.verdict;
+  const stage = inferBlockStage(payload);
+  const inputBlocked = verdict === "BLOCK" && stage === "input";
+
+  if (verdict === "ALLOW") {
+    if (inputPreviewSrc) showImageInWrap(inputPreviewWrap, inputPreviewSrc);
+    else setPreviewPlaceholder(inputPreviewWrap, "—");
+    if (outputPreviewSrc) showImageInWrap(outputPreviewWrap, outputPreviewSrc);
+    else setPreviewPlaceholder(outputPreviewWrap, "—");
+  } else if (verdict === "BLOCK") {
+    if (inputBlocked) {
+      if (inputPreviewSrc) showImageInWrap(inputPreviewWrap, inputPreviewSrc, { blocked: true });
+      else setPreviewPlaceholder(inputPreviewWrap, "Скрыто политикой");
+      setPreviewPlaceholder(outputPreviewWrap, "Генератор не вызван");
+    } else {
+      if (inputPreviewSrc) showImageInWrap(inputPreviewWrap, inputPreviewSrc);
+      else setPreviewPlaceholder(inputPreviewWrap, "—");
+      if (outputPreviewSrc) showImageInWrap(outputPreviewWrap, outputPreviewSrc, { blocked: true });
+      else setPreviewPlaceholder(outputPreviewWrap, "Скрыто политикой");
+    }
+  } else {
+    if (inputPreviewSrc) showImageInWrap(inputPreviewWrap, inputPreviewSrc);
+    else setPreviewPlaceholder(inputPreviewWrap, "—");
+    if (outputPreviewSrc) showImageInWrap(outputPreviewWrap, outputPreviewSrc);
+    else setPreviewPlaceholder(outputPreviewWrap, "—");
+  }
+}
+
 function choosePreset(name) {
   if (!presetConfig[name]) return;
   activePreset = name;
@@ -239,6 +277,7 @@ function choosePreset(name) {
   promptInput.value = p.prompt || "";
   inputImage.value = "";
   generatedImage.value = "";
+  clearPreviews();
   updateFileLabels();
   document.querySelectorAll(".case").forEach(b => b.classList.toggle("active", b.dataset.preset === name));
 }
@@ -314,12 +353,16 @@ function showPayload(payload) {
   decisionMeta.textContent = verdictDisplay;
   setDecisionState(payload.verdict === "ALLOW" ? "allow" : "block");
   renderPassport(payload);
-  setDownloadMessage();
 
   const canDownload = payload.verdict === "ALLOW" && payload.artifact_id;
   downloadButton.disabled = !canDownload;
   downloadButton.dataset.artifact = payload.artifact_id || "";
   exportButton.disabled = !payload.request_id;
+  if (!canDownload && payload.verdict === "BLOCK") {
+    setDownloadMessage("Артефакт заблокирован.", "error");
+  } else {
+    setDownloadMessage();
+  }
 
   finalizePipeline(payload);
   renderSoc(payload);
@@ -357,9 +400,11 @@ function renderPassport(payload) {
   if (!p) {
     passportContent.classList.add("hidden");
     passportEmpty.classList.remove("hidden");
-    passportEmpty.textContent = payload.verdict === "BLOCK"
-      ? "Паспорт не выпущен: выдача артефакта заблокирована."
-      : "Паспорт появится после разрешённой проверки.";
+    if (payload.verdict === "BLOCK" || payload.verdict === "OFFLINE") {
+      passportEmpty.innerHTML = "<b>Паспорт не выпущен.</b> Артефакт заблокирован политикой безопасности.";
+    } else {
+      passportEmpty.textContent = "Паспорт появится после разрешённой проверки.";
+    }
     return;
   }
   passportEmpty.classList.add("hidden");
@@ -395,17 +440,13 @@ function renderSoc(payload) {
   const status = document.querySelector("#soc-status");
   const sev = document.querySelector("#soc-severity");
   const title = document.querySelector("#soc-title");
-  if (payload.verdict === "ALLOW") {
-    resetSoc();
-    return;
-  }
+  if (payload.verdict === "ALLOW") { resetSoc(); return; }
   socPanel.classList.add("alert");
   socEmpty.classList.add("hidden");
   socBody.classList.remove("hidden");
   status.textContent = "ИНЦИДЕНТ SOC";
   const severity = payload.severity || (payload.verdict === "BLOCK" ? "HIGH" : "MEDIUM");
-  sev.textContent = severityLabel(severity); sev.dataset.sev = severity;
-  sev.title = severity;
+  sev.textContent = severityLabel(severity); sev.dataset.sev = severity; sev.title = severity;
   title.textContent = activePreset === "offline" ? "ЗАПРЕТ ВЫДАЧИ · цензор недоступен" : "ИНЦИДЕНТ SOC";
   document.querySelector("#soc-event").textContent = `EVT-${(payload.request_id || "demo0001").slice(0, 8)}`;
   document.querySelector("#soc-category").textContent = categoriesText(payload.categories) || (activePreset === "offline" ? "Сбой цензора" : "Нарушение политики");
@@ -482,7 +523,7 @@ function resetTimeline() { setTimeline({}); }
 // ===== Download =====
 async function downloadArtifact(artifactId) {
   const token = tokenInput.value.trim();
-  if (!token) { showError("Введите токен загрузки для проверенной выдачи."); return; }
+  if (!token) { showError("Введите токен загрузки."); return; }
   try {
     const response = await fetch(`/v1/download/${encodeURIComponent(artifactId)}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok) {
@@ -524,7 +565,7 @@ exportButton.addEventListener("click", () => {
   URL.revokeObjectURL(link.href);
 });
 
-// ===== Submit =====
+// ===== Submit (manual mode) =====
 form.addEventListener("submit", async event => {
   event.preventDefault();
   submitButton.disabled = true;
@@ -541,7 +582,9 @@ form.addEventListener("submit", async event => {
   if (actualGenerated) body.append("generated_image", actualGenerated, actualGenerated.name);
 
   try {
-    showPayload(await apiModerate(body));
+    const payload = await apiModerate(body);
+    showPayload(payload);
+    applyDecisionPreviews(payload);
   } catch (e) {
     showError(e.message);
   } finally {
@@ -550,13 +593,16 @@ form.addEventListener("submit", async event => {
   }
 });
 
+// ===== Dataset results table =====
 function renderDatasetRows(rows) {
   datasetResults.innerHTML = rows.map((item, index) => `
     <tr class="${item.passed ? "pass" : "fail"}">
-      <td>${esc(item.title)}</td>
+      <td>${index + 1}</td>
+      <td title="${esc(item.title)}">${esc(item.title)}</td>
       <td>${esc(item.expected_decision)}</td>
       <td>${esc(item.actual_decision)}</td>
       <td>${item.passed ? "PASS" : "FAIL"}</td>
+      <td title="${esc(item.reason || "")}">${esc(shortReason(item.reason))}</td>
     </tr>
   `).join("");
 }
@@ -565,7 +611,7 @@ function dashboardPayloadFromDatasetResult(item) {
   return {
     request_id: item.id || "dataset-demo",
     verdict: item.actual_decision || "ERROR",
-    categories: [],
+    categories: item.categories || [],
     severity: item.actual_decision === "ALLOW" ? "NONE" : "HIGH",
     reason: item.reason,
     artifact_id: item.artifact_id,
@@ -575,22 +621,23 @@ function dashboardPayloadFromDatasetResult(item) {
   };
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// ===== Dataset manifest load =====
 async function loadDatasetManifest() {
   datasetProgress.textContent = "Загрузка manifest";
   try {
     const payload = await apiGetDataset();
     datasetResults.innerHTML = (payload.cases || []).map((item, index) => `
       <tr>
+        <td>${index + 1}</td>
         <td>${esc(item.title)}</td>
         <td>${esc(item.expected_decision)}</td>
         <td>—</td>
         <td>—</td>
+        <td>—</td>
       </tr>
-    `).join("") || `<tr><td colspan="4">manifest пуст</td></tr>`;
+    `).join("") || `<tr><td colspan="6">manifest пуст</td></tr>`;
     datasetProgress.textContent = `0/${payload.count || 0}`;
     datasetCurrentCase.textContent = payload.count ? "готово к запуску" : "—";
     datasetCurrentExpected.textContent = "—";
@@ -602,11 +649,12 @@ async function loadDatasetManifest() {
     datasetProgress.textContent = `Ошибка: ${e.message}`;
     datasetSummary.textContent = "FAIL";
     datasetSummary.dataset.state = "fail";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
     throw e;
   }
 }
 
+// ===== Dataset upload =====
 datasetUploadInput.addEventListener("change", async () => {
   const files = Array.from(datasetUploadInput.files || []);
   if (!files.length) return;
@@ -614,14 +662,16 @@ datasetUploadInput.addEventListener("change", async () => {
   datasetProgress.textContent = "Загрузка датасета";
   try {
     const payload = await apiUploadDataset(files);
-    datasetResults.innerHTML = (payload.cases || []).map(item => `
+    datasetResults.innerHTML = (payload.cases || []).map((item, index) => `
       <tr>
+        <td>${index + 1}</td>
         <td>${esc(item.title)}</td>
         <td>${esc(item.expected_decision)}</td>
         <td>—</td>
         <td>—</td>
+        <td>—</td>
       </tr>
-    `).join("") || `<tr><td colspan="4">manifest пуст</td></tr>`;
+    `).join("") || `<tr><td colspan="6">manifest пуст</td></tr>`;
     datasetProgress.textContent = `0/${payload.count || 0}`;
     datasetCurrentCase.textContent = "датасет загружен";
     datasetCurrentExpected.textContent = "—";
@@ -633,13 +683,14 @@ datasetUploadInput.addEventListener("change", async () => {
     datasetCurrentCase.textContent = "ошибка загрузки";
     datasetSummary.textContent = "FAIL";
     datasetSummary.dataset.state = "fail";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
   } finally {
     datasetUploadInput.value = "";
     datasetDemoButton.disabled = false;
   }
 });
 
+// ===== Auto-demo run =====
 datasetDemoButton.addEventListener("click", async () => {
   datasetDemoButton.disabled = true;
   datasetDemoButton.textContent = "Автодемо выполняется…";
@@ -650,12 +701,12 @@ datasetDemoButton.addEventListener("click", async () => {
   datasetCurrentActual.textContent = "—";
   datasetCurrentResult.textContent = "—";
   datasetCurrentResult.dataset.state = "";
+  clearPreviews();
   try {
     const info = await loadDatasetManifest();
     datasetProgress.textContent = `Шаг 0/${info.count || 0}`;
 
     const payload = await apiRunDataset();
-
     const rows = [];
     for (const item of payload.results || []) {
       rows.push(item);
@@ -666,9 +717,17 @@ datasetDemoButton.addEventListener("click", async () => {
       datasetCurrentActual.textContent = item.actual_decision || "—";
       datasetCurrentResult.textContent = item.passed ? "PASS" : "FAIL";
       datasetCurrentResult.dataset.state = item.passed ? "pass" : "fail";
-      datasetSummary.textContent = `${rows.filter(row => row.passed).length}/${payload.count} PASS`;
+      datasetSummary.textContent = `${rows.filter(r => r.passed).length}/${payload.count} PASS`;
       datasetSummary.dataset.state = item.passed ? "pass" : "fail";
-      showPayload(dashboardPayloadFromDatasetResult(item));
+
+      const demoPayload = dashboardPayloadFromDatasetResult(item);
+      const inputFilename = extractDatasetFilename(item.input_image);
+      const generatedFilename = extractDatasetFilename(item.generated_image);
+      inputPreviewSrc = inputFilename ? `/demo-dataset/image/${encodeURIComponent(inputFilename)}` : null;
+      outputPreviewSrc = generatedFilename ? `/demo-dataset/image/${encodeURIComponent(generatedFilename)}` : null;
+      showPayload(demoPayload);
+      applyDecisionPreviews(demoPayload);
+
       await sleep(1200);
     }
     datasetProgress.textContent = `${payload.count}/${payload.count}`;
@@ -678,7 +737,7 @@ datasetDemoButton.addEventListener("click", async () => {
     datasetProgress.textContent = `Ошибка: ${e.message}`;
     datasetSummary.textContent = "FAIL";
     datasetSummary.dataset.state = "fail";
-    datasetResults.innerHTML = `<tr class="fail"><td colspan="4">${esc(e.message)}</td></tr>`;
+    datasetResults.innerHTML = `<tr class="fail"><td colspan="6">${esc(e.message)}</td></tr>`;
     showError(e.message);
   } finally {
     datasetDemoButton.disabled = false;
@@ -686,12 +745,10 @@ datasetDemoButton.addEventListener("click", async () => {
   }
 });
 
+// ===== API demo =====
 apiDemoButton.addEventListener("click", async () => {
   const file = apiDemoImage.files[0];
-  if (!file) {
-    setApiDemoResult("Выберите изображение для API demo.", "error");
-    return;
-  }
+  if (!file) { setApiDemoResult("Выберите изображение для API demo.", "error"); return; }
   apiDemoButton.disabled = true;
   apiDemoButton.textContent = "API…";
   setApiDemoResult("Проверка…");
@@ -708,10 +765,35 @@ apiDemoButton.addEventListener("click", async () => {
   }
 });
 
+// ===== File inputs with preview =====
+inputImage.addEventListener("change", () => {
+  presetInputFile = null;
+  updateFileLabels();
+  if (inputImage.files[0]) {
+    if (inputPreviewSrc && inputPreviewSrc.startsWith("blob:")) URL.revokeObjectURL(inputPreviewSrc);
+    inputPreviewSrc = URL.createObjectURL(inputImage.files[0]);
+    showImageInWrap(inputPreviewWrap, inputPreviewSrc);
+  } else {
+    inputPreviewSrc = null;
+    setPreviewPlaceholder(inputPreviewWrap, "нет файла");
+  }
+});
+
+generatedImage.addEventListener("change", () => {
+  presetGeneratedFile = null;
+  updateFileLabels();
+  if (generatedImage.files[0]) {
+    if (outputPreviewSrc && outputPreviewSrc.startsWith("blob:")) URL.revokeObjectURL(outputPreviewSrc);
+    outputPreviewSrc = URL.createObjectURL(generatedImage.files[0]);
+    showImageInWrap(outputPreviewWrap, outputPreviewSrc);
+  } else {
+    outputPreviewSrc = null;
+    setPreviewPlaceholder(outputPreviewWrap, "нет файла");
+  }
+});
+
 // ===== Wire up =====
 document.querySelectorAll(".case").forEach(b => b.addEventListener("click", () => choosePreset(b.dataset.preset)));
-inputImage.addEventListener("change", () => { presetInputFile = null; updateFileLabels(); });
-generatedImage.addEventListener("change", () => { presetGeneratedFile = null; updateFileLabels(); });
 choosePreset("safe");
 setPipelineState({ user: "done" });
 resetPassport();

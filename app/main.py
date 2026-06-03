@@ -273,6 +273,9 @@ def create_app(
                     "reason": response.reason,
                     "artifact_id": response.artifact_id,
                     "passport": response.passport.model_dump(mode="json") if response.passport else None,
+                    "categories": list(response.categories) if response.categories else [],
+                    "input_image": case.get("input"),
+                    "generated_image": case.get("generated"),
                 }
             except Exception as exc:
                 result = {
@@ -284,6 +287,9 @@ def create_app(
                     "reason": str(exc),
                     "artifact_id": None,
                     "passport": None,
+                    "categories": [],
+                    "input_image": case.get("input"),
+                    "generated_image": case.get("generated"),
                 }
             results.append(result)
 
@@ -292,6 +298,17 @@ def create_app(
             "passed": sum(1 for item in results if item["passed"]),
             "results": results,
         }
+
+    @app.get("/demo-dataset/image/{filename:path}", include_in_schema=False)
+    def demo_dataset_image(filename: str) -> Response:
+        dataset_dir = demo_dataset_dir()
+        resolved = resolve_demo_file(filename, dataset_dir)
+        if not resolved.exists() or not resolved.is_file():
+            raise HTTPException(status_code=404, detail="Image not found")
+        content_type = mimetypes.guess_type(resolved.name)[0] or "image/png"
+        if not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Not an image file")
+        return Response(content=resolved.read_bytes(), media_type=content_type)
 
     @app.get("/v1/download/{artifact_id}")
     def download(
