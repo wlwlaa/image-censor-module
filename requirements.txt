@@ -8,3 +8,4 @@ easyocr
 httpx
 pydantic-settings
 pytest
+jinja2

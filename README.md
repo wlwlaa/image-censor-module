@@ -86,6 +86,18 @@ If OpenRouter uses a different model slug, update `LLAMA_GUARD_MODEL` in `.env`.
 uvicorn app.main:app --reload
 ```
 
+## Web UI
+
+Open the local moderation console:
+
+```text
+http://127.0.0.1:8000/ui
+```
+
+The UI provides drag and drop image upload, image preview, full pipeline checks, direct Llama Guard checks, readable verdict cards, OCR text, suspicious detector diagnostics, Llama Guard details and raw JSON output.
+
+The interface uses local Jinja2 templates, static CSS and vanilla JavaScript. It does not store uploaded images on disk; selected images are previewed in the browser and sent to the existing backend API endpoints.
+
 Docs:
 
 ```text
@@ -130,6 +142,83 @@ X-Title
 
 ```bash
 pytest
+```
+
+## Dataset Evaluation
+
+The project includes a script for evaluating the image moderation pipeline on a folder dataset with this layout:
+
+```text
+dataset/
+├── Category A/
+│   ├── safe/
+│   └── unsafe/
+└── Category B/
+    ├── safe/
+    └── unsafe/
+```
+
+Start the API first:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Then run the evaluator:
+
+```bash
+python scripts/evaluate_image_pipeline.py \
+  --dataset-dir "C:\Users\bulie\Downloads\Telegram Desktop\dataset" \
+  --repeats 3 \
+  --pass-k 1 2 3
+```
+
+On Windows PowerShell:
+
+```powershell
+python scripts\evaluate_image_pipeline.py `
+  --dataset-dir "C:\Users\bulie\Downloads\Telegram Desktop\dataset" `
+  --repeats 3 `
+  --pass-k 1 2 3
+```
+
+HTTP transport is the default because it is usually faster when the API process already has OCR models loaded. If you want to avoid running `uvicorn`, use in-process transport:
+
+```powershell
+python scripts\evaluate_image_pipeline.py `
+  --dataset-dir "C:\Users\bulie\Downloads\Telegram Desktop\dataset" `
+  --transport in-process
+```
+
+The script saves:
+
+- `evaluation_reports/metrics_<timestamp>.json`
+- `evaluation_reports/predictions_<timestamp>.csv`
+- `evaluation_reports/metrics_latest.json`
+- `evaluation_reports/predictions_latest.csv`
+
+Metrics include:
+
+- overall recall;
+- recall by target label: `safe`, `unsafe`;
+- recall by dataset category;
+- recall by category and target label;
+- `pass@k` for unsafe samples, where pass means an unsafe image was accepted as safe at least once among the first `k` attempts.
+
+If the backend disconnects or a request fails, the evaluator records that attempt as `unsafe` with an API error and continues. Checkpoints are saved every 25 images by default. Use `--checkpoint-every` to change that interval. Use `--resume` to continue from `predictions_latest.csv` without recomputing completed attempts:
+
+```powershell
+python scripts\evaluate_image_pipeline.py `
+  --dataset-dir "C:\Users\bulie\Downloads\Telegram Desktop\dataset" `
+  --resume
+```
+
+For unattended runs, use the supervisor runner. It restarts the evaluator after a crash and always resumes from `predictions_latest.csv`:
+
+```powershell
+python scripts\run_evaluation_until_complete.py `
+  --dataset-dir "C:\Users\bulie\Downloads\Telegram Desktop\dataset" `
+  --max-restarts 20
 ```
 
 ## Success Response Example

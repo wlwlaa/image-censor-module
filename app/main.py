@@ -1,6 +1,8 @@
 import io
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from PIL import Image, UnidentifiedImageError
 
 from app.schemas.response_schemas import (
@@ -18,6 +20,8 @@ from app.services.ocr_service import extract_text_from_image
 
 
 app = FastAPI(title="FastAPI Image Upload Service")
+templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get("/")
@@ -26,6 +30,11 @@ async def healthcheck() -> dict[str, str]:
         "status": "ok",
         "message": "FastAPI Image Upload Service is running",
     }
+
+
+@app.get("/ui")
+async def ui(request: Request):
+    return templates.TemplateResponse(request, "index.html")
 
 
 async def _read_valid_image_file(

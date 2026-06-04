@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Шлюз безопасности изображений</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar" aria-label="Шапка приложения">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <div class="brand-row">
+              <h1>Шлюз безопасности изображений</h1>
+              <span class="bank-badge">Альфа-Банк</span>
+            </div>
+            <p>Проверка perturbation-паттернов, OCR и модерация Llama Guard</p>
+          </div>
+        </div>
+        <span class="console-badge">FastAPI консоль</span>
+      </header>
+
+      <main class="dashboard">
+        <section class="panel upload-panel" aria-labelledby="upload-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Входные данные</p>
+              <h2 id="upload-title">Загрузка изображения</h2>
+            </div>
+            <button class="ghost-button" id="resetButton" type="button">Сбросить</button>
+          </div>
+
+          <label class="dropzone" id="dropzone" for="fileInput">
+            <input id="fileInput" type="file" accept="image/*" />
+            <span class="drop-icon" aria-hidden="true">+</span>
+            <strong>Перетащите изображение сюда</strong>
+            <span>или выберите файл на устройстве</span>
+          </label>
+
+          <div class="preview-card" id="previewCard" hidden>
+            <img id="previewImage" alt="Предпросмотр выбранного изображения" />
+            <div class="file-meta">
+              <strong id="fileName">Файл не выбран</strong>
+              <span id="fileSize">0 KB</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" id="fullCheckButton" type="button">
+              Полная проверка
+            </button>
+            <button class="secondary-button" id="llamaOnlyButton" type="button">
+              Только Llama Guard
+            </button>
+          </div>
+        </section>
+
+        <section class="panel verdict-panel" aria-labelledby="verdict-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Вердикт</p>
+              <h2 id="verdict-title">Результат модерации</h2>
+            </div>
+            <span class="status-badge idle" id="statusBadge">Ожидание</span>
+          </div>
+
+          <div class="verdict-copy">
+            <h3 id="verdictHeadline">Загрузите изображение, чтобы начать проверку.</h3>
+            <p id="verdictMessage">Консоль покажет итоговый вердикт, OCR-текст и диагностические данные модели.</p>
+            <p class="reason-line" id="reasonLine"></p>
+          </div>
+
+          <ol class="timeline" id="timeline" aria-label="Шаги пайплайна модерации">
+            <li data-step="validation"><span></span>Валидация файла</li>
+            <li data-step="suspicious"><span></span>Эвристика suspicious perturbation</li>
+            <li data-step="ocr"><span></span>Извлечение текста OCR</li>
+            <li data-step="llama"><span></span>Модерация Llama Guard</li>
+            <li data-step="final"><span></span>Итоговый вердикт</li>
+          </ol>
+        </section>
+      </main>
+
+      <section class="details-grid" aria-label="Детали анализа">
+        <article class="detail-card">
+          <div class="detail-header">
+            <h3>OCR-текст</h3>
+            <span id="ocrStatus">Не проверено</span>
+          </div>
+          <pre id="ocrText">OCR-текста пока нет.</pre>
+        </article>
+
+        <article class="detail-card">
+          <div class="detail-header">
+            <h3>Suspicious detector</h3>
+            <span id="suspiciousStatus">Не проверено</span>
+          </div>
+          <div class="kv-list" id="suspiciousDetails"></div>
+        </article>
+
+        <article class="detail-card">
+          <div class="detail-header">
+            <h3>Llama Guard</h3>
+            <span id="llamaStatus">Не проверено</span>
+          </div>
+          <div class="kv-list" id="llamaDetails"></div>
+        </article>
+      </section>
+
+      <section class="panel raw-panel">
+        <details>
+          <summary>Сырой JSON-ответ</summary>
+          <pre id="rawJson">{}</pre>
+        </details>
+      </section>
+    </div>
+
+    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+  </body>
+</html>
